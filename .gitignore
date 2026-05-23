@@ -38,6 +38,6 @@ venv.bak/
 
 # Custom
 tasks/
-db/
+data/
 tmp/
 *.ini

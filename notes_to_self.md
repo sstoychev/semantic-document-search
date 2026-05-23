@@ -30,3 +30,8 @@ Notes:
 4. Index updates on insert/update/delete
     - index update after X changex or X time
     - main + delta index
+5. Authorisation/Authentication
+    - master password set at project initialization
+    - login API methods
+    - users creation with permissions
+    - JWT with salt for permission groups. Salt reset/invalidation for token revocation.

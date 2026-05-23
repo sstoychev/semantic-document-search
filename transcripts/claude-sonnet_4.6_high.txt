@@ -1,0 +1,16 @@
+I need skeleton structrure in python for FastAPI applicaton. The application will be about storing txt documents and performing sematntic search on them. I will be using LanceDB and SQLite.
+I want the business logic to be in "services" defined by entity. For start only "documents" and "users". Both should have dummy CRUD methods for the moment.
+I need two main endpoints:
+- add document
+- search documents
+Both should call the relevant service and methods.
+I need dummy endpoints for login/logout.
+I need requirements.txt with all packages to be installed.
+I need script to setup and activate venv.
+
+----------------
+I want the following changes:
+- config should be config.ini - read and parsed at startup
+- the users can't register on their own. They are only created by the administrator.
+- the setup script should check if config.ini exists. If not it should copy config.example to config.ini, ask for administrator password and hash it with salt=current_timestamp. The hashed password and the salt should be stored in the config too.
+- the setup script should check for existance of the databases and if they don't exists we should create them (dummy methods for the moment).
