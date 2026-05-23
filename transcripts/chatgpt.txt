@@ -1,0 +1,1276 @@
+This is a copy of a shared ChatGPT conversation
+
+Report conversation
+
+Your architecture direction is very solid already.
+
+Especially this part:
+
+vector db
+text db
+embedding generation
+reranker
+
+This is exactly the correct separation for scalable retrieval systems.
+
+And your approach with:
+
+ANN retrieval
+increased ef_search
+retrieve 200–400
+rerank top 20
+
+is very standard production-style retrieval architecture.
+
+You are already thinking in the correct way.
+
+1. Why store text in both LanceDB and SQLite initially?
+
+Short answer:
+
+simplicity and convenience
+
+not performance.
+
+Why duplication is commonly used initially
+
+Because then:
+
+each system is independently queryable
+debugging becomes easier
+prototyping becomes faster
+retrieval pipelines become simpler
+
+Example:
+
+LanceDB-only retrieval debugging
+results = table.search(vec).limit(10)
+
+You immediately get:
+
+text
+metadata
+embeddings
+
+No second lookup needed.
+
+Without duplication
+
+You retrieve:
+
+chunk_ids = [...]
+
+Then must:
+
+query SQLite
+fetch text
+reconstruct results
+
+More moving parts.
+
+But architecturally…
+
+You are absolutely correct:
+
+For large-scale systems:
+
+duplication is wasteful
+
+Especially at:
+
+100M chunks
+
+duplicating 2KB text chunks becomes massive.
+
+What I would personally recommend for you
+
+Because you already understand retrieval systems well:
+
+Store text only once from the start
+
+I think this is the better architecture for you.
+
+Recommended design
+LanceDB stores:
+{
+    "chunk_id": str,
+    "embedding": vector,
+    "metadata": ...
+}
+SQLite FTS5 stores:
+{
+    "chunk_id": str,
+    "text": str
+}
+Retrieval flow
+Vector retrieval
+
+LanceDB returns:
+
+chunk_id
+vector score
+FTS retrieval
+
+SQLite returns:
+
+chunk_id
+BM25 score
+Fusion
+
+Python merges:
+
+vector scores
+lexical scores
+Final text fetch
+
+After reranking:
+
+fetch only top final texts
+
+This is actually cleaner architecturally.
+
+Benefits
+Massive storage savings
+
+At 100M chunks:
+
+avoiding duplication may save:
+
+hundreds of GB
+Better separation of concerns
+
+Your systems become:
+
+LanceDB
+vector index only
+SQLite
+text retrieval + storage
+
+Much cleaner.
+
+Downsides
+
+Slightly more orchestration complexity.
+
+But honestly:
+for your level this is trivial.
+
+I would absolutely do single-text-storage.
+
+2. Quantization complexity + accuracy loss
+
+This is where things become interesting.
+
+Quantization types
+
+There are many.
+
+The main practical categories:
+
+Type	Complexity	Accuracy Loss
+float16	tiny	tiny
+scalar quantization	low	low
+product quantization (PQ)	medium	moderate
+binary quantization	high	large
+For your POC
+
+You should probably think about:
+
+float16 first
+
+Maybe:
+
+PQ later
+Float16 complexity
+
+Almost none.
+
+Usually:
+
+embedding.astype(np.float16)
+
+Done.
+
+Accuracy impact of float16
+
+Typically:
+
+almost negligible
+
+for retrieval.
+
+Especially:
+
+cosine similarity
+ANN retrieval
+
+usually barely affected.
+
+Real-world expectation
+
+Recall degradation often:
+
+< 1%
+
+Sometimes effectively zero.
+
+This is why many production systems use:
+
+float16
+mixed precision
+Huge benefit
+
+Storage reduction:
+
+3072 bytes→1536 bytes
+
+Exactly half.
+
+This is enormous at scale.
+
+Recommendation
+
+I strongly recommend:
+
+float16 embeddings
+
+from the beginning.
+
+Very low risk.
+
+Product Quantization (PQ)
+
+Now complexity rises substantially.
+
+What PQ does
+
+Instead of storing:
+
+full precise vectors
+
+it stores:
+
+compressed representations
+
+Often:
+
+4x
+8x
+16x smaller
+Complexity increase
+
+Moderate.
+
+You now must:
+
+train quantizers
+tune PQ params
+evaluate recall
+rebuild indexes carefully
+Practical issue
+
+PQ affects:
+
+nearest-neighbor quality
+
+especially:
+
+top-1/top-5 accuracy
+Expected recall loss
+
+Very dependent on configuration.
+
+Typical:
+
+Compression	Recall Loss
+2x	tiny
+4x	low
+8x	noticeable
+16x	substantial
+Realistic expectation
+
+Good PQ setup:
+
+1–5% recall reduction
+
+Sometimes more.
+
+Important insight
+
+Because you rerank:
+
+recall matters more than ranking precision
+
+Meaning:
+
+If ANN+PQ still retrieves:
+
+relevant candidates into top200
+
+then reranker can fix ordering.
+
+This makes PQ more acceptable in reranked systems.
+
+My recommendation for your POC
+DO:
+float16
+ANN indexing
+ef_search tuning
+DO NOT initially:
+implement PQ
+
+unless:
+
+dataset becomes huge
+memory/storage actually becomes a problem
+
+PQ adds real engineering complexity.
+
+3. Float16 accuracy loss
+
+This one is much simpler.
+
+Retrieval quality impact
+
+Usually extremely small.
+
+Why?
+
+Embeddings are already:
+
+noisy approximations
+semantically fuzzy
+
+Tiny precision reductions rarely matter.
+
+In practice
+
+Most systems see:
+
+0–1% recall degradation
+
+sometimes literally unmeasurable.
+
+Especially because you rerank
+
+Your pipeline:
+
+ANN retrieval
+→ top200
+→ reranker
+
+is very robust against tiny ANN imperfections.
+
+The reranker compensates.
+
+One caveat
+
+If you:
+
+aggressively normalize
+use very small distances
+require exact ranking stability
+
+then float16 may matter more.
+
+But for semantic retrieval:
+it is usually completely fine.
+
+Final recommendation for your architecture
+
+I would do:
+
+Storage
+LanceDB
+
+Store:
+
+float16 embeddings
+chunk_id
+metadata only
+
+NO raw text.
+
+SQLite FTS5
+
+Store:
+
+chunk_id
+chunk text
+BM25 index
+Retrieval pipeline
+query
+ ↓
+embedding
+ ↓
+LanceDB ANN retrieval (top200)
+ ↓
+SQLite FTS retrieval (top200)
+ ↓
+RRF fusion
+ ↓
+cross-encoder reranking
+ ↓
+fetch final text rows
+ANN settings
+
+Your approach is good.
+
+Equivalent of:
+
+ef_search = 200–400
+
+is very reasonable.
+
+Scalability
+
+With:
+
+float16
+no text duplication
+ANN
+reranking only top200
+
+your architecture becomes dramatically more scalable already.
+
+And importantly:
+you are designing in a way that can later evolve toward:
+
+pgvector
+Qdrant
+Elasticsearch
+OpenSearch
+Milvus
+
+without major rewrites.
+
+I have clear view of what should be done.
+Few remaining questions:
+1. Multilingual support - the embedding models handle multiple languages relatively OK and I don't need vectors for the different languages. Storing texts in multiple languages increases the storage dramatically. I used to store only English texts and translate if I detect the query is in another language. Is there better strategy?
+2. Testing - where can I get 10k documents legally? Wikipedia?
+3. Results quality - I am alone and I can manually confirm and test only very limited set of results. Also I can confirm only of the results are relevant to the query, but I can't check if there are missing results. Any thoughts on this?
+
+You are now asking the important retrieval-engineering questions.
+These are exactly the kinds of problems real search systems face.
+
+1. Multilingual support strategy
+
+Your old approach:
+
+store English only
+translate queries
+
+is actually a very reasonable production strategy.
+
+Especially for:
+
+storage efficiency
+simpler indexing
+better retrieval consistency
+
+This is much more common than people think.
+
+Why multilingual storage becomes expensive
+
+If you store:
+
+EN + BG + DE + FR + ...
+
+your:
+
+storage
+chunk count
+embedding count
+indexing cost
+
+all multiply.
+
+At scale this becomes huge.
+
+Better strategy?
+
+There are basically 3 viable architectures.
+
+Strategy A — Your current approach
+Canonical language storage
+
+Store:
+
+English chunks only
+
+At query time:
+
+detect language
+translate query to English
+retrieve English results
+
+Optional:
+
+translate final snippets back
+Advantages
+
+Very efficient:
+
+single embedding set
+single FTS index
+smaller storage
+simpler retrieval
+Disadvantages
+
+Translation quality matters.
+
+Potential issues:
+
+domain terminology
+abbreviations
+proper nouns
+ambiguous words
+
+But modern translation is often surprisingly good.
+
+This strategy is especially good if:
+documents are mostly English
+English is canonical source language
+multilingual support is secondary
+Strategy B — True multilingual embeddings
+
+Store:
+
+original-language chunks only
+
+Use multilingual embedding model:
+
+E5 multilingual
+BGE multilingual
+
+Query:
+
+no translation needed
+Advantages
+
+Cleaner semantically:
+
+native-language retrieval
+less translation error
+Disadvantages
+
+Cross-language retrieval quality is still imperfect.
+
+Example:
+
+Bulgarian query
+English document
+
+may retrieve worse than:
+
+English query
+English document
+
+Even strong multilingual models are not magical.
+
+Important reality
+
+Many multilingual embedding benchmarks look better than real-world retrieval quality.
+
+Especially for:
+
+technical content
+product names
+domain-specific text
+Strategy C — Hybrid multilingual
+
+Very common in enterprise systems.
+
+Store:
+
+canonical English
+selected localized fields/snippets
+
+Query:
+
+multilingual embeddings
+optional translation fallback
+
+Most sophisticated.
+Most expensive.
+
+Probably unnecessary for your POC.
+
+My recommendation for your task
+
+I would honestly keep your original strategy.
+
+Recommended approach
+Store
+
+Only:
+
+English chunks
+English embeddings
+English FTS
+Query flow
+detect language
+ ↓
+translate to English
+ ↓
+retrieve English chunks
+ ↓
+rerank
+ ↓
+(optional) translate snippets
+Why this is actually strong
+
+Because:
+
+English embedding models are usually best
+English FTS tokenization is best
+storage stays small
+retrieval quality is more stable
+Especially important for FTS
+
+SQLite FTS5 multilingual stemming/tokenization is much weaker than:
+
+Lucene/OpenSearch analyzers
+
+English-only simplifies things dramatically.
+
+2. Where to get 10k legal documents
+
+Yes:
+
+Wikipedia
+is probably your best option.
+
+Especially because:
+
+legally usable
+large
+multilingual
+structured
+clean enough
+Good sources
+Wikipedia dumps
+
+Official dumps:
+
+Wikipedia Dumps
+
+You can:
+
+download XML dumps
+extract article text
+easily get 10k+ docs
+Advantages
+
+Excellent for:
+
+semantic retrieval
+chunking experiments
+multilingual testing
+scalability testing
+Downsides
+
+Wikipedia is:
+
+too “clean”
+too well-written
+
+Real enterprise docs are usually much messier.
+
+But for a POC:
+excellent choice.
+
+Other excellent datasets
+Project Gutenberg
+
+Project Gutenberg
+
+Public domain books.
+
+Good for:
+
+long-form chunking
+retrieval experiments
+ArXiv papers
+
+arXiv
+
+Great for:
+
+technical retrieval
+PDF extraction testing
+Hugging Face datasets
+
+Hugging Face Datasets
+
+Search for:
+
+msmarco
+wikipedia
+BEIR datasets
+
+Very useful.
+
+Best recommendation for you
+Use:
+Wikipedia articles
+plus BEIR benchmark datasets
+
+This gives:
+
+realistic retrieval evaluation
+real benchmark queries
+3. Retrieval quality evaluation
+
+This is the hardest part in search engineering.
+
+And your observation is exactly correct:
+
+you can verify relevance
+but not recall completeness
+
+This is a fundamental retrieval problem.
+
+Real-world truth
+
+Even large companies struggle with:
+
+search evaluation
+relevance labeling
+recall estimation
+Best practical strategy for a solo developer
+
+You need:
+
+benchmark datasets
+labeled relevance pairs
+
+NOT just manual testing.
+
+This is extremely important
+
+Without benchmarks:
+you are mostly optimizing blindly.
+
+Use BEIR
+
+This is probably the single most important recommendation.
+
+BEIR
+
+BEIR contains:
+
+documents
+queries
+relevance labels
+
+for many retrieval tasks.
+
+Why BEIR matters
+
+It gives you:
+
+known-good query/document matches
+measurable recall
+measurable ranking quality
+
+Metrics:
+
+Recall@k
+NDCG
+MRR
+
+Now you can objectively compare:
+
+embedding models
+chunk sizes
+ANN params
+rerankers
+Example evaluation
+
+You test:
+
+top20 retrieval recall
+
+Question:
+
+Did relevant document appear in top20?
+
+Now you can compare systems scientifically.
+
+This solves your “missing results” problem
+
+Because benchmark datasets already contain:
+
+relevance judgments
+
+You no longer guess manually.
+
+Realistic workflow
+Build pipeline
+documents
+↓
+chunking
+↓
+embeddings
+↓
+ANN retrieval
+↓
+reranking
+Evaluate
+
+Against:
+
+BEIR queries
+relevance labels
+
+Measure:
+
+Recall@10
+Recall@20
+MRR
+NDCG
+Most important metric for your architecture
+
+Probably:
+
+Recall@200 before reranking
+
+Because:
+
+reranker cannot recover missing documents
+
+This is critical.
+
+Important insight
+
+For reranked systems:
+
+Retrieval stage optimizes:
+recall
+Reranker optimizes:
+precision/ranking
+
+This separation is extremely important.
+
+Final recommendations
+Multilingual
+
+Keep:
+
+English canonical storage
+query translation
+
+This is a very practical architecture.
+
+Dataset
+
+Use:
+
+Wikipedia
+BEIR datasets
+Evaluation
+
+Use:
+
+BEIR benchmarks
+Recall@k
+NDCG
+MRR
+
+instead of only manual inspection.
+
+This will make your POC look dramatically more professional and technically grounded.
+
+I just started reading about LanceDB's HNSW index. One of the major reasons for using it in PostgreSQL is that I don't need data in advance in order to create it and PostgreSQL updates it automatically on insert. Also pgvector's HNSW is better for read-mostly use cases.
+This is not the case in LanceDB - it is inside IVF partition. Also for the OSS version, which I will use, the index is not updated automatically.
+For the initial setup everything looks fine - I will insert data and generate the indexes. But what about some real world cases - not all the data will be inserted at start, new documents will come, others will be deleted or modified. I don't mind manually calling something after insert/update/delete in the DB -  can this update the index quickly and not re-create it?
+
+Yes — you discovered one of the biggest practical differences between:
+
+PostgreSQL + pgvector
+and
+many standalone vector DBs
+
+especially local-first ones like LanceDB.
+
+What you are noticing is fundamentally:
+
+transactional index maintenance
+vs
+analytical batch indexing
+
+And this distinction matters a lot in real systems.
+
+PostgreSQL pgvector behavior
+
+With pgvector HNSW:
+
+CREATE INDEX ... USING hnsw
+
+After that:
+
+inserts automatically update index
+deletes update index
+updates update index
+
+This feels like:
+
+normal database behavior
+
+because PostgreSQL is:
+
+transactional
+row-oriented
+OLTP-focused
+
+This is extremely convenient.
+
+LanceDB behavior
+
+LanceDB is much closer to:
+
+analytical storage
+append-oriented systems
+data lake architecture
+
+The ANN index is more like:
+
+derived acceleration structure
+
+than a fully transactional index.
+
+Your concern is absolutely valid
+
+You correctly identified:
+
+real systems are not static
+
+Documents:
+
+arrive
+change
+get deleted
+
+continuously.
+
+Important practical answer
+You do NOT need to rebuild everything.
+
+But:
+
+incremental index maintenance is weaker/simpler than PostgreSQL
+
+especially in OSS/local-first vector DBs.
+
+How LanceDB typically handles this
+
+The storage layer itself supports:
+
+appends
+updates
+deletes
+
+But ANN indexes may become:
+
+partially stale
+suboptimal
+
+until optimized/rebuilt.
+
+Critical insight
+
+This is actually common in vector systems.
+
+Even many large production systems use:
+
+periodic index rebuilds
+compaction
+background optimization
+
+instead of perfect real-time ANN maintenance.
+
+Why?
+
+Because ANN indexes are fundamentally hard to maintain incrementally.
+
+Especially:
+
+IVF
+PQ
+graph structures
+HNSW in pgvector is somewhat special
+
+PostgreSQL pays:
+
+write overhead
+maintenance cost
+transactional complexity
+
+to give you:
+
+always-consistent indexes
+
+Very convenient.
+Not always the most scalable.
+
+LanceDB philosophy
+
+More like:
+
+fast reads
+cheap appends
+periodic optimization
+Real-world practical strategy
+
+For your use case:
+
+This is completely manageable.
+
+You do NOT need:
+
+instant perfect ANN maintenance
+
+for semantic search systems.
+
+Typical architecture
+New documents inserted
+
+They are:
+
+appended immediately
+searchable immediately
+
+possibly via:
+
+brute-force fallback
+or
+partially indexed retrieval
+Periodic optimization
+
+Every:
+
+N inserts
+or
+hourly/daily
+
+run:
+
+index optimization
+compaction
+rebuild
+
+This is extremely common.
+
+Think about search engines
+
+Even:
+
+Elasticsearch/OpenSearch
+Lucene
+
+work similarly.
+
+Segments:
+
+accumulate
+merge later
+
+Not everything is immediately globally optimized.
+
+Important distinction
+Exact search indexes
+
+Easy incremental maintenance.
+
+ANN indexes
+
+Much harder incremental maintenance.
+
+This is fundamental.
+
+Your scale matters
+
+For your POC:
+
+10k docs
+maybe 100k chunks
+
+this is basically irrelevant operationally.
+
+You can rebuild indexes very quickly.
+
+Even at larger scale
+
+If:
+
+updates are relatively infrequent
+workload is read-heavy
+
+periodic rebuilds are completely acceptable.
+
+And you already mentioned:
+
+read-mostly use case
+
+which is ideal for this architecture.
+
+Realistic production pattern
+
+Very common approach:
+
+Main optimized ANN index
+
+Built periodically.
+
+Small “delta” index
+
+Contains:
+
+newest documents
+recent updates
+
+Query searches:
+
+ANN main index
+delta index
+
+then merges results.
+
+This is extremely common
+
+Because:
+
+rebuilding huge ANN indexes continuously is expensive
+Example architecture
+main_index
+    = optimized bulk ANN
+
+delta_index
+    = recent inserts
+
+Query:
+
+search both
+↓
+merge
+↓
+rerank
+
+Then periodically:
+
+compact delta into main
+You may not even need this initially
+
+For your POC:
+
+You can likely just:
+
+append
+periodically rebuild ANN
+
+Very simple.
+
+Important practical question
+How expensive are rebuilds?
+
+At:
+
+100k chunks
+
+probably trivial.
+
+At:
+
+millions of vectors
+
+can become:
+
+minutes
+hours
+
+depending on:
+
+index type
+hardware
+Another important thing
+
+You are already designing the correct abstraction layer.
+
+Because you separated:
+
+vector store
+embedding generation
+reranker
+
+you can later migrate to:
+
+pgvector
+Qdrant
+Milvus
+Weaviate
+
+without major rewrites.
+
+This is exactly the correct long-term design.
+
+Very important recommendation
+
+For your architecture:
+
+Treat ANN index as eventually optimized
+
+NOT:
+
+transactionally perfect
+
+This mindset aligns much better with modern vector systems.
+
+What I would do in your case
+Initial POC
+Simple approach
+
+After:
+
+batch inserts
+major updates
+
+run:
+
+rebuild_or_optimize_index()
+
+Done.
+
+Very acceptable.
+
+Later scaling approach
+
+If needed:
+
+Introduce:
+main index
+delta index
+
+This scales nicely.
+
+Final practical assessment
+
+Your PostgreSQL experience exposed you to a very elegant model:
+
+transactional ANN indexing
+
+But many modern vector DBs intentionally trade that away for:
+
+scalability
+simpler architecture
+analytical workloads
+cheaper ingestion
+
+For semantic search:
+this tradeoff is usually acceptable.
+
+Especially because:
+
+retrieval systems are naturally approximate already
+reranking compensates heavily
+eventual optimization is fine for read-heavy systems.
