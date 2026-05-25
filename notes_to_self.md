@@ -1,5 +1,7 @@
 # Initial research
-[ChatGPT](https://chatgpt.com/share/6a118f29-cab4-83eb-b56c-e07eaabce8a6)
+Chats are split because the bot starts halucinating.
+[ChatGPT - part 1](https://chatgpt.com/share/6a118f29-cab4-83eb-b56c-e07eaabce8a6)
+[ChatGPT - part 2](https://chatgpt.com/share/6a142cb8-8994-83eb-84cb-846375f79ba7)
 
 Notes:
 - LanceDB
@@ -20,7 +22,7 @@ Notes:
     - script to create and activate venv
     - config for embeddings and reranker models, db files paths
 2. Implement methods for:
-    - embeddings generation - ==**CHUNKING!!!**==
+    - embeddings generation - ==**CHUNKING!!!**== -> recursive: heading -> section -> paragraph -> sentence -> tokens, respecting headings, code blocks, bullet lists, tables. 500 tokens, 100 tokens overlap. PyMuPDF
     - store in LanceDB and SQLite (no index update at this point!)
     - vector + fts search
     - reranking
@@ -28,10 +30,18 @@ Notes:
     - Wikipedia
     - Hugging Face BEIR - msmarco
 4. Index updates on insert/update/delete
-    - index update after X changex or X time
+    - index update after X changes or X time
     - main + delta index
 5. Authorisation/Authentication
     - master password set at project initialization
     - login API methods
     - users creation with permissions
     - JWT with salt for permission groups. Salt reset/invalidation for token revocation.
+
+# Further future improvements
+1. Review used packages/libraries and remove ones, which are used very little, with custom code. This is for security reasons
+2. Product Quantization (PQ) - reducing the vector database size by compressing vectors to 2x, 4x, 8x, 16x smaller ones. If storage/size is a problem we should train quantizers + fine tune their parameters and evaluate results. There will be loss of quality(recall) and we should evaluate if we are OK with this and eventually to what extend.
+3. Semantic chunking - detecting actual topic changes/transitions, for example installation instructions -> troubleshooting.
+4. Dynamic chunk size - analyze the document if it is more of short statements/facts(FAQs, support docs, short ansers) or long statements (conceptual docs, fiction writing). Small chunks = ⬆️precision, ⬆️reranker quality, ⬇️context loss, ⬇️vectors/storage. Large chunks = ⬆️context, ⬆️vectors/storage, ⬇️semantic delusion, ⬇️ANN precision, ⬇️reranker noise, ⬇️latency
+5. Multilangual native support - depending on quality and if we have enough resources we may check if using the native language of the document/query gives significantly better results.
+6. Replace PyMuPDF with unstructured.io for more complex analysis.

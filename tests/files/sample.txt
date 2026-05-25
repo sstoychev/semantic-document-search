@@ -1,0 +1,60 @@
+# Python Web Frameworks
+
+## Introduction
+
+Web frameworks are software libraries designed to support the development of
+web applications, including web services, web resources, and web APIs. They
+handle common tasks such as routing, templating, and authentication.
+
+## Popular Frameworks
+
+### Flask
+
+Flask is a lightweight WSGI web application framework. It is designed to make
+getting started quick and easy, with the ability to scale up to complex
+applications. Flask is classified as a micro-framework.
+
+### Django
+
+Django is a high-level Python web framework that encourages rapid development
+and clean, pragmatic design. Built by experienced developers, it takes care of
+much of the hassle of web development so you can focus on writing your app.
+
+## Comparison
+
+| Framework | Type  | First Release |
+|-----------|-------|---------------|
+| Flask     | Micro | 2010          |
+| Django    | Full  | 2005          |
+| FastAPI   | Async | 2018          |
+
+## Key Features
+
+- URL routing and request dispatching
+- Template rendering engine
+- Database abstraction layer
+- Built-in authentication and authorization
+- Comprehensive testing utilities
+
+## Code Example
+
+### Hello World with Flask
+
+```python
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "Hello, World!"
+
+if __name__ == "__main__":
+    app.run(debug=True)
+```
+
+## Conclusion
+
+Choosing the right web framework depends on your project requirements, team
+expertise, and scalability needs. Flask offers simplicity while Django provides
+a full-featured ecosystem out of the box.

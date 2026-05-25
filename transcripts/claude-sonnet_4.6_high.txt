@@ -14,3 +14,115 @@ I want the following changes:
 - the users can't register on their own. They are only created by the administrator.
 - the setup script should check if config.ini exists. If not it should copy config.example to config.ini, ask for administrator password and hash it with salt=current_timestamp. The hashed password and the salt should be stored in the config too.
 - the setup script should check for existance of the databases and if they don't exists we should create them (dummy methods for the moment).
+
+-----------------
+
+I want to create "chunker" for the documents. I want to support these documents:
+- TXT
+- HTML - beautifulsoup or lxml
+- PDF - PyMuPDF
+- DOCX - python-docx
+
+Initially I want to have method to get the blocks of text, and after this use these blocks to create proper chunks of certain tokens length, which to be turned into vectors and stored in the databases.
+I want to preserve "unsplittable parts"- headings, tables, bullet lists, code blocks.
+
+Create method to get all the blocks of the document. I want 1 parameters - path to local file and depending on the file to use the relevant tool for chunking. It should return list of items with - block position, type, path/breadcrumbs (title->secton etc), text.
+Create only the method for the blocks and update requirements.txt with the necessary packages. Do not create methods for further processing of the blocks, these will be done later.
+
+------------------
+
+I want to create some tests. Create 'tests/files' directory and inside I want one file for each txt, pdf, html, docx document type.
+The files should have the same information. I want to have 5-20 blocks - 1 main heading, few lesser headings, paragraphs, table, bullet list, code block.
+Create one simple txt file with with just 5-20 paragraphs, no other elements.
+I want to test getting list of blocks for each document. Create the relevant test.
+
+(Stoycho: failed first try)
+-------------------
+
+Add pytest and other packages to requirements.txt
+
+-------------------
+
+$ pytest -v
+======================================================== test session starts =========================================================
+platform linux -- Python 3.14.4, pytest-9.0.3, pluggy-1.6.0 -- /home/wonderboy/semantic-document-search/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/wonderboy/semantic-document-search
+configfile: pytest.ini
+testpaths: tests
+plugins: asyncio-1.3.0, anyio-4.13.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 38 items
+
+tests/test_chunker.py::TestTxt::test_returns_blocks PASSED                                                                     [  2%]
+tests/test_chunker.py::TestTxt::test_first_block_is_h1 PASSED                                                                  [  5%]
+tests/test_chunker.py::TestTxt::test_heading_breadcrumbs PASSED                                                                [  7%]
+tests/test_chunker.py::TestTxt::test_has_list_block PASSED                                                                     [ 10%]
+tests/test_chunker.py::TestTxt::test_has_code_block PASSED                                                                     [ 13%]
+tests/test_chunker.py::TestTxt::test_no_table_block PASSED                                                                     [ 15%]
+tests/test_chunker.py::TestTxt::test_sequential_positions PASSED                                                               [ 18%]
+tests/test_chunker.py::TestTxt::test_valid_breadcrumbs PASSED                                                                  [ 21%]
+tests/test_chunker.py::TestPlainTxt::test_only_paragraph_blocks PASSED                                                         [ 23%]
+tests/test_chunker.py::TestPlainTxt::test_block_count_in_range PASSED                                                          [ 26%]
+tests/test_chunker.py::TestPlainTxt::test_sequential_positions PASSED                                                          [ 28%]
+tests/test_chunker.py::TestPlainTxt::test_empty_breadcrumbs PASSED                                                             [ 31%]
+tests/test_chunker.py::TestHtml::test_returns_blocks PASSED                                                                    [ 34%]
+tests/test_chunker.py::TestHtml::test_first_block_is_h1 PASSED                                                                 [ 36%]
+tests/test_chunker.py::TestHtml::test_has_table_block PASSED                                                                   [ 39%]
+tests/test_chunker.py::TestHtml::test_has_list_block PASSED                                                                    [ 42%]
+tests/test_chunker.py::TestHtml::test_has_code_block_with_language PASSED                                                      [ 44%]
+tests/test_chunker.py::TestHtml::test_table_breadcrumbs PASSED                                                                 [ 47%]
+tests/test_chunker.py::TestHtml::test_sequential_positions PASSED                                                              [ 50%]
+tests/test_chunker.py::TestHtml::test_valid_breadcrumbs PASSED                                                                 [ 52%]
+tests/test_chunker.py::TestPdf::test_returns_blocks PASSED                                                                     [ 55%]
+tests/test_chunker.py::TestPdf::test_first_heading_is_h1 PASSED                                                                [ 57%]
+tests/test_chunker.py::TestPdf::test_multiple_heading_levels PASSED                                                            [ 60%]
+tests/test_chunker.py::TestPdf::test_has_paragraph_blocks PASSED                                                               [ 63%]
+tests/test_chunker.py::TestPdf::test_metadata_has_page_number PASSED                                                           [ 65%]
+tests/test_chunker.py::TestPdf::test_sequential_positions PASSED                                                               [ 68%]
+tests/test_chunker.py::TestPdf::test_valid_breadcrumbs PASSED                                                                  [ 71%]
+tests/test_chunker.py::TestDocx::test_returns_blocks PASSED                                                                    [ 73%]
+tests/test_chunker.py::TestDocx::test_first_block_is_h1 PASSED                                                                 [ 76%]
+tests/test_chunker.py::TestDocx::test_has_table_block PASSED                                                                   [ 78%]
+tests/test_chunker.py::TestDocx::test_has_list_block FAILED                                                                    [ 81%]
+tests/test_chunker.py::TestDocx::test_has_code_block PASSED                                                                    [ 84%]
+tests/test_chunker.py::TestDocx::test_code_block_is_merged PASSED                                                              [ 86%]
+tests/test_chunker.py::TestDocx::test_heading_breadcrumbs PASSED                                                               [ 89%]
+tests/test_chunker.py::TestDocx::test_sequential_positions PASSED                                                              [ 92%]
+tests/test_chunker.py::TestDocx::test_valid_breadcrumbs PASSED                                                                 [ 94%]
+tests/test_chunker.py::TestErrors::test_file_not_found PASSED                                                                  [ 97%]
+tests/test_chunker.py::TestErrors::test_unsupported_extension PASSED                                                           [100%]
+
+============================================================== FAILURES ==============================================================
+____________________________________________________ TestDocx.test_has_list_block ____________________________________________________
+
+self = <test_chunker.TestDocx object at 0x7ae9f9c57bb0>
+sample_docx_path = PosixPath('/home/wonderboy/semantic-document-search/tests/files/sample.docx')
+
+    def test_has_list_block(self, sample_docx_path: Path) -> None:
+        blocks = get_blocks(sample_docx_path)
+        list_blocks = [b for b in blocks if b.type == BlockType.LIST]
+>       assert list_blocks, "No LIST block found"
+E       AssertionError: No LIST block found
+E       assert []
+
+tests/test_chunker.py:225: AssertionError
+====================================================== short test summary info =======================================================
+FAILED tests/test_chunker.py::TestDocx::test_has_list_block - AssertionError: No LIST block found
+==================================================== 1 failed, 37 passed in 2.36s =================
+
+I checked the docx file on my windows laptop, it has tables.
+
+-------------
+
+When I get blocks for the pdf I don't see a block for the heading "Key features".
+
+-------------
+(Stoycho - the bot changed the generation of the pdf in order the test to pass)
+You just adjusted the test case so it doesn't give error and not fixed the code. Could you explain why?
+(Stoycho - fix in the parser, worse - neither of "Key features" is found now)
+-------------
+
+Roll-back the changes. It is worse now. In the pdf blocks I don't see "Key features" at all.
+(Stoycho - rolled back, future TODO)
+-------------
