@@ -17,6 +17,9 @@ class Settings:
     sqlite_url: str = _cfg.get("database", "sqlite_url", fallback="sqlite:///./data/app.db")
     lancedb_uri: str = _cfg.get("database", "lancedb_uri", fallback="./data/lancedb")
 
+    # Data directories
+    datasets_dir: str = _cfg.get("data", "datasets_dir", fallback="data/datasets")
+
     # Chunking
     chunk_tokens: int = _cfg.getint("chunking", "chunk_tokens", fallback=500)
     overlap_tokens: int = _cfg.getint("chunking", "overlap_tokens", fallback=100)

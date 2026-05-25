@@ -33,4 +33,7 @@ pytest-asyncio>=0.23.0   # async test support
 
 # NLP / sentence splitting
 spacy>=3.7.0             # en_core_web_sm model must be downloaded separately:
+
+# Dataset download (test data)
+datasets>=2.20.0
                          #   python -m spacy download en_core_web_sm

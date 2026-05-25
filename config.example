@@ -2,6 +2,10 @@
 sqlite_url = sqlite:///./data/app.sqlite3
 lancedb_uri = ./data/lancedb
 
+[data]
+; Root directory for downloaded datasets (relative to project root or absolute)
+datasets_dir = data/datasets
+
 [chunking]
 ; Target token count per chunk (approximate — never splits code/tables/lists)
 chunk_tokens = 500

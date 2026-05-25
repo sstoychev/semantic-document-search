@@ -184,3 +184,63 @@ I want all tables created, dependancies installed and models downloaded when I e
 When I execute the file I see many requests to huggingface. This should not happen after the initial setup. The app or any part of it should not do ANY setup or downloads when started. All setup and downloads should be done only by starting setup_venv.sh. When starting the app or any part of it only exesing resources should be loaded and if there is anything missing there should be the normal error.
 
 -------------
+
+I need script to download test data from https://huggingface.co/datasets/BeIR/msmarco if it doesn't exist. If it exists we should use the downloaded set.
+The script should insert 10k documents from the data using indexing_service.process_file() in batches of 30 files. We shoukd see progress and elapsed time.
+
+-------------
+
+I need script to download test data from https://huggingface.co/datasets/BeIR/msmarco if it doesn't exist. If it exists we should use the downloaded set.
+The script should insert 10k documents from the data using indexing_service.process_file() in batches of 30 files. We shoukd see progress and elapsed time.
+
+-------------
+
+Where does datasets download the files?
+
+-------------
+I want this to be configurable. I want all the fies for this project to be somewhere in the root directory. The downloaded datasets should be in data/ by default.
+Also I noticed I have 10k documents and 10k chunks, meaning every document has only one chunk. Can you check if this is correct for this data?
+(Answer: 1 chunk per document is correct — MS MARCO is a passage-level dataset; each entry is already a short snippet (30–90 tokens), well under the 500-token chunk limit. Nothing to fix there.)
+
+-------------
+
+Now I need script similar to the one for msmarco, but for wikipedia articles. Again 10k articles.
+
+-------------
+
+While runnig the script I saw:
+
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (2174 > 512). Running this sequence through the model will result in indexing errors
+
+Explain.
+
+-------------
+
+The warning always says:
+
+WARNING Single sentence exceeds max_tokens
+
+Is this message the same regardless of the chunk type - table, list, etc?
+
+-------------
+
+Sentences with 500-2000+ tokens (~2000+ chars)  seem strange. Can you check the first 30 files and verify this?
+
+-------------
+
+We have to fix the splitters. We should never have chunks with more tokens than then model limit.
+If chunk+breadcrumbs + overlap > model_limit => split further
+Currenrly we have "non-splittable" chunks. We should be able to split them too.
+Tables should be split by rows.
+Lists and code should be split by lines.
+Code blocks by lines too
+
+If the original spplitting and the above splits don't work we should finally split by new lines then punctuation and finally by token count.
+Any further suggestions are welcomed.
+
+-------------
+
+I don't see any level 3?
+For tables I see Markdown rows, but we have different sources - txt, pdf, docx etc
+
+-------------

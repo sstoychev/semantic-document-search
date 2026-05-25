@@ -17,18 +17,18 @@ Notes:
 
 # Plan
 
-1. Skeleton structure for FastAPI (two endpoints) + swagger calling dummy services for business logic
-    - requirements.txt with the necessary packages
-    - script to create and activate venv
-    - config for embeddings and reranker models, db files paths
+1. ✅Skeleton structure for FastAPI (two endpoints) + swagger calling dummy services for business logic
+    - ✅requirements.txt with the necessary packages
+    - ✅script to create and activate venv
+    - ✅config for embeddings and reranker models, db files paths
 2. Implement methods for:
-    - embeddings generation - ==**CHUNKING!!!**== -> recursive: heading -> section -> paragraph -> sentence -> tokens, respecting headings, code blocks, bullet lists, tables. 500 tokens, 100 tokens overlap. PyMuPDF
-    - store in LanceDB and SQLite (no index update at this point!)
+    - ✅embeddings generation - ==**CHUNKING!!!**== -> recursive: heading -> section -> paragraph -> sentence -> tokens, respecting headings, code blocks, bullet lists, tables. 500 tokens, 100 tokens overlap. PyMuPDF
+    - ✅store in LanceDB and SQLite (no index update at this point!)
     - vector + fts search
     - reranking
 3. Script to seed 10k documents
     - Wikipedia
-    - Hugging Face BEIR - msmarco
+    - ✅Hugging Face BEIR - msmarco -> insert 10k documents (10k chunks, 30-90tokens) in 644s
 4. Index updates on insert/update/delete
     - index update after X changes or X time
     - main + delta index
