@@ -1,64 +1,60 @@
 #!/usr/bin/env python3
 """
-Database initialisation helper.
-Checks whether SQLite and LanceDB stores exist and creates them if not.
-Run after scripts/setup_config.py so that config.ini is already in place.
+Database initialisation and model pre-download.
+Runs after scripts/setup_config.py so that config.ini is already in place.
 """
-import configparser
+import sys
 from pathlib import Path
 
-CONFIG_FILE = Path("config.ini")
+# Put the project root on sys.path so `app` can be imported.
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
-def _read_config() -> configparser.ConfigParser:
-    cfg = configparser.ConfigParser()
-    cfg.read(CONFIG_FILE)
-    return cfg
+def init_sqlite() -> None:
+    """Create all SQLite tables (idempotent — uses CREATE TABLE IF NOT EXISTS)."""
+    # Import models first so SQLAlchemy registers them with Base.
+    import app.models.document  # noqa: F401
+    import app.models.chunk     # noqa: F401
+    from app.database import Base, engine
+
+    Base.metadata.create_all(bind=engine)
+    print("  SQLite tables ready.")
 
 
-def init_sqlite(sqlite_url: str) -> None:
-    """
-    Create the SQLite database file and all tables if they don't exist.
-    TODO: replace the placeholder touch() with Base.metadata.create_all(engine)
-          once all models are finalised.
-    """
-    db_path = Path(sqlite_url.replace("sqlite:///", ""))
+def init_lancedb() -> None:
+    """Ensure the LanceDB storage directory exists."""
+    from app.config import settings
 
-    if db_path.exists():
-        print(f"  SQLite  {db_path} — already exists, skipping.")
-        return
-
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    # TODO: import engine + Base and call Base.metadata.create_all(engine)
-    db_path.touch()
-    print(f"  SQLite  {db_path} — created.")
-
-
-def init_lancedb(lancedb_uri: str) -> None:
-    """
-    Create the LanceDB data directory if it doesn't exist.
-    TODO: connect via lancedb.connect() and create the documents table schema.
-    """
-    db_path = Path(lancedb_uri)
-
-    if db_path.exists():
-        print(f"  LanceDB {db_path} — already exists, skipping.")
-        return
-
+    db_path = Path(settings.lancedb_uri)
     db_path.mkdir(parents=True, exist_ok=True)
-    # TODO: lancedb.connect(lancedb_uri) and create initial table
-    print(f"  LanceDB {db_path} — created.")
+    print(f"  LanceDB directory ready: {db_path}")
+
+
+def download_embedding_model() -> None:
+    """Pre-download the HuggingFace tokenizer and sentence-transformers model."""
+    from app.config import settings
+
+    model_name = settings.embedding_model
+    print(f"  Downloading tokenizer: {model_name} ...")
+    from transformers import AutoTokenizer
+    AutoTokenizer.from_pretrained(model_name)
+
+    print(f"  Downloading embedding model: {model_name} ...")
+    from sentence_transformers import SentenceTransformer
+    SentenceTransformer(model_name)
+
+    print(f"  Embedding model ready.")
 
 
 def main() -> None:
-    cfg = _read_config()
-    sqlite_url = cfg.get("database", "sqlite_url", fallback="sqlite:///./data/app.db")
-    lancedb_uri = cfg.get("database", "lancedb_uri", fallback="./data/lancedb")
+    print("Initialising databases ...")
+    init_sqlite()
+    init_lancedb()
+    print("Done.\n")
 
-    print("Checking databases ...")
-    init_sqlite(sqlite_url)
-    init_lancedb(lancedb_uri)
-    print("Database check complete.")
+    print("Downloading models ...")
+    download_embedding_model()
+    print("Done.")
 
 
 if __name__ == "__main__":

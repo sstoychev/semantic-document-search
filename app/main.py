@@ -3,6 +3,10 @@ from fastapi import FastAPI
 from app.routers import documents, auth
 from app.database import Base, engine
 
+# Import all models so SQLAlchemy registers their tables before create_all.
+import app.models.document  # noqa: F401
+import app.models.chunk     # noqa: F401
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(

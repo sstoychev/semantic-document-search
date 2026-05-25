@@ -1,0 +1,25 @@
+[database]
+sqlite_url = sqlite:///./data/app.sqlite3
+lancedb_uri = ./data/lancedb
+
+[chunking]
+; Target token count per chunk (approximate — never splits code/tables/lists)
+chunk_tokens = 500
+; Overlap token count prepended from the previous chunk
+overlap_tokens = 100
+; Parallel workers for file processing
+max_workers = 5
+; SQLite / LanceDB insert batch size (in chunks; never splits a document)
+batch_size = 100
+
+[embedding]
+model = BAAI/bge-small-en-v1.5
+
+[auth]
+secret_key = change-me-in-production
+algorithm = HS256
+access_token_expire_minutes = 30
+; Populated by setup_venv.sh — do not edit manually
+admin_username = admin
+admin_hashed_password =
+admin_salt =

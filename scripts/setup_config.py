@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 CONFIG_FILE = Path("config.ini")
-CONFIG_EXAMPLE = Path("config.example.ini")
+CONFIG_EXAMPLE = Path("config.example")
 
 
 def main() -> None:

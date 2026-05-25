@@ -1,25 +1,21 @@
-from datetime import datetime
-
 from pydantic import BaseModel
 
 
 class DocumentBase(BaseModel):
-    title: str
-    content: str
+    document_path: str
+    name: str
 
 
 class DocumentCreate(DocumentBase):
     pass
 
 
-class DocumentUpdate(DocumentBase):
-    pass
+class DocumentUpdate(BaseModel):
+    name: str | None = None
 
 
 class DocumentResponse(DocumentBase):
     id: int
-    owner_id: int | None
-    created_at: datetime
 
     model_config = {"from_attributes": True}
 
@@ -30,7 +26,9 @@ class SearchQuery(BaseModel):
 
 
 class SearchResult(BaseModel):
-    id: int
-    title: str
+    chunk_id: int
+    document_id: int
+    document_name: str
     score: float
     snippet: str | None = None
+    breadcrumbs: list[str] = []

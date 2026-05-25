@@ -28,6 +28,10 @@ echo "Installing requirements ..."
 "$VENV_DIR/bin/pip" install -r requirements.txt
 echo "Dependencies installed."
 
+echo "Downloading spaCy English model ..."
+"$VENV_DIR/bin/python" -m spacy download en_core_web_sm
+echo "spaCy model ready."
+
 # ---------------------------------------------------------------------------
 # 2. Configuration
 # ---------------------------------------------------------------------------

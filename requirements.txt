@@ -30,3 +30,7 @@ python-docx>=1.1.0       # DOCX parsing
 # Testing
 pytest>=8.0.0
 pytest-asyncio>=0.23.0   # async test support
+
+# NLP / sentence splitting
+spacy>=3.7.0             # en_core_web_sm model must be downloaded separately:
+                         #   python -m spacy download en_core_web_sm

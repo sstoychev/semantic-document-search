@@ -126,3 +126,61 @@ You just adjusted the test case so it doesn't give error and not fixed the code.
 Roll-back the changes. It is worse now. In the pdf blocks I don't see "Key features" at all.
 (Stoycho - rolled back, future TODO)
 -------------
+
+Now I want to generate the actual chunks and from there to generate the ebedings and store the data in the databases.
+I want to use BAAI/bge-small-en-v1.5 model. This should be configurable in config.ini.
+My taget are ~500 tokens for chunk + ~100 tokens overlap. Both configurable in config.ini
+We need to:
+1. Build semantic blocks(sections) = heading+associated paragraphs
+2. If the section exceeds the limit - split by paragraphs then sentences. Never split code blocks, lists, tables.
+3. If we can't split any further in order to fit the limit - keep the text as is and print warning.
+4. Add overlap
+
+For sentence splitting use spaCy.
+
+In sqlite we should store:
+Documents table
+1. ID - autoinc
+2. document path
+3. name
+Chunks table:
+1. Id autoinc
+2. document_id
+3. chunk position in the document
+4. breadcrumbs  - json array
+5. Tokens count
+6. embeddings model
+7. Raw text
+
+The input for the vetors should be: embedding_input = (
+    "\n".join(breadcrumbs[-3:])
+    + "\n\n"
+    + chunk_text
+)
+
+In LanceDB - store the vectors + chunk_id from sqlite.
+
+I need a method to accept list of files.
+1. Process the files in parallel (5 instances, configurable in config.ini).
+2. Collect all the data.
+3. Store the data in SQLite in baches of 100 always including all chunks of a document. For example if we have 10 documents with 30 chunks each, we store two batches of 4 documents (120 chunks) and then the rest.
+4. Generate vectors and store them in LanceDB again in batches of 100.
+
+------------
+
+Finish this fils in the same way as /home/wonderboy/semantic-document-search/tmp/test_file_parts.py
+I want simple, straightforward test parsing and inserting data for a list of files.
+
+-------------
+
+When I run this file I get error:
+
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such table: documents
+
+I want all tables created, dependancies installed and models downloaded when I execute setup_venv.sh
+
+-------------
+
+When I execute the file I see many requests to huggingface. This should not happen after the initial setup. The app or any part of it should not do ANY setup or downloads when started. All setup and downloads should be done only by starting setup_venv.sh. When starting the app or any part of it only exesing resources should be loaded and if there is anything missing there should be the normal error.
+
+-------------

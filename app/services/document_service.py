@@ -9,12 +9,12 @@ class DocumentService:
     # CRUD
     # ------------------------------------------------------------------
 
-    def create(self, db: Session, payload: DocumentCreate, owner_id: int | None = None) -> Document:
+    def create(self, db: Session, payload: DocumentCreate) -> Document:
         """
-        Persist a new document to SQLite.
-        TODO: generate embedding and upsert into LanceDB.
+        Persist a new document record to SQLite.
+        Use indexing_service.process_files() to also chunk and embed.
         """
-        db_doc = Document(**payload.model_dump(), owner_id=owner_id)
+        db_doc = Document(**payload.model_dump())
         db.add(db_doc)
         db.commit()
         db.refresh(db_doc)
@@ -29,10 +29,7 @@ class DocumentService:
         return db.query(Document).offset(skip).limit(limit).all()
 
     def update(self, db: Session, document_id: int, payload: DocumentUpdate) -> Document | None:
-        """
-        Update document fields in SQLite.
-        TODO: re-embed and update LanceDB vector.
-        """
+        """Update document fields in SQLite."""
         db_doc = self.get(db, document_id)
         if db_doc is None:
             return None
@@ -44,9 +41,26 @@ class DocumentService:
 
     def delete(self, db: Session, document_id: int) -> bool:
         """
-        Remove a document from SQLite.
-        TODO: delete the corresponding vector from LanceDB.
+        Remove a document and its chunks from SQLite.
+        TODO: delete the corresponding vectors from LanceDB.
         """
+        db_doc = self.get(db, document_id)
+        if db_doc is None:
+            return False
+        db.delete(db_doc)
+        db.commit()
+        return True
+
+    def search(self, db: Session, query: SearchQuery) -> list[SearchResult]:
+        """
+        Semantic search over indexed chunks.
+        TODO: embed query, query LanceDB for nearest vectors, return ranked results.
+        """
+        return []
+
+
+document_service = DocumentService()
+
         db_doc = self.get(db, document_id)
         if db_doc is None:
             return False

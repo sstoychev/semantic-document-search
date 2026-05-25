@@ -17,6 +17,15 @@ class Settings:
     sqlite_url: str = _cfg.get("database", "sqlite_url", fallback="sqlite:///./data/app.db")
     lancedb_uri: str = _cfg.get("database", "lancedb_uri", fallback="./data/lancedb")
 
+    # Chunking
+    chunk_tokens: int = _cfg.getint("chunking", "chunk_tokens", fallback=500)
+    overlap_tokens: int = _cfg.getint("chunking", "overlap_tokens", fallback=100)
+    max_workers: int = _cfg.getint("chunking", "max_workers", fallback=5)
+    batch_size: int = _cfg.getint("chunking", "batch_size", fallback=100)
+
+    # Embedding
+    embedding_model: str = _cfg.get("embedding", "model", fallback="BAAI/bge-small-en-v1.5")
+
     # Auth
     secret_key: str = _cfg.get("auth", "secret_key", fallback="change-me-in-production")
     algorithm: str = _cfg.get("auth", "algorithm", fallback="HS256")
