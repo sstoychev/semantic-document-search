@@ -52,33 +52,21 @@ class DocumentService:
         return True
 
     def search(self, db: Session, query: SearchQuery) -> list[SearchResult]:
-        """
-        Semantic search over indexed chunks.
-        TODO: embed query, query LanceDB for nearest vectors, return ranked results.
-        """
-        return []
-
-
-document_service = DocumentService()
-
-        db_doc = self.get(db, document_id)
-        if db_doc is None:
-            return False
-        db.delete(db_doc)
-        db.commit()
-        return True
-
-    # ------------------------------------------------------------------
-    # Semantic search
-    # ------------------------------------------------------------------
-
-    def search(self, db: Session, query: SearchQuery) -> list[SearchResult]:
-        """
-        Embed the query and run a vector search in LanceDB.
-        TODO: replace with real embedding + LanceDB query.
-        """
-        _ = db  # will be used once LanceDB integration is wired up
-        return []
+        """Hybrid search: vector + FTS + RRF + cross-encoder reranking."""
+        from app.services import search_service
+        hits = search_service.search(query.query, top_k=query.limit)
+        return [
+            SearchResult(
+                chunk_id=h["chunk_id"],
+                document_id=h["document_id"],
+                document_name=h["document_name"],
+                document_path=h["document_path"],
+                score=h["score"],
+                snippet=h["snippet"],
+                breadcrumbs=h["breadcrumbs"],
+            )
+            for h in hits
+        ]
 
 
 document_service = DocumentService()

@@ -28,6 +28,7 @@ class Settings:
 
     # Embedding
     embedding_model: str = _cfg.get("embedding", "model", fallback="BAAI/bge-small-en-v1.5")
+    rerank_model: str = _cfg.get("embedding", "rerank_model", fallback="cross-encoder/ms-marco-MiniLM-L-6-v2")
 
     # Auth
     secret_key: str = _cfg.get("auth", "secret_key", fallback="change-me-in-production")

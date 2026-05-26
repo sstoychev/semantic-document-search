@@ -29,6 +29,7 @@ class SearchResult(BaseModel):
     chunk_id: int
     document_id: int
     document_name: str
+    document_path: str = ""
     score: float
     snippet: str | None = None
     breadcrumbs: list[str] = []

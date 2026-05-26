@@ -244,3 +244,28 @@ I don't see any level 3?
 For tables I see Markdown rows, but we have different sources - txt, pdf, docx etc
 
 -------------
+
+It is time to get to the search. I need:
+
+Verify of the indexes are in place. If not -create them for both SQLite3 and LanceDB.
+Method to accept the search query, generate vector, perform hybrid search - vector top200 + FTS top200 + RRF fusion + cross-encoder-reranking -> return top 20
+
+-------------
+
+No creating or setup should happen in main.py at the start of the app. We may check there and if anything is missing there should be an error and prevent the app from starting. All setup/creation/configuration should happen only from setup_venv.sh. Make the necessary changes.
+
+-------------
+
+Now back to the indexes. For SQLite everything is fine with FTS5.
+For LanceDB why IVF_PQ and not HNSW? Just give me comprehensive short answer, don't change anything for the moment.
+
+-------------
+
+Ok, do the necessary changes to switch to IVF_HNSW_PQ or any other HNSW index if it would be better.
+
+-------------
+
+1. Create tests in tests/ for the current data. In general the data may be different, but for the moment we need a few tests with the current data.
+2. Create simple test files in tmp/ with 5-6 search queries, which I can execute and see the results
+
+-------------

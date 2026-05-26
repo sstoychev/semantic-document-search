@@ -1,13 +1,15 @@
+import logging
+
 from fastapi import FastAPI
 
 from app.routers import documents, auth
-from app.database import Base, engine
+from app.database import verify_ready
 
-# Import all models so SQLAlchemy registers their tables before create_all.
-import app.models.document  # noqa: F401
-import app.models.chunk     # noqa: F401
+logging.basicConfig(level=logging.INFO)
 
-Base.metadata.create_all(bind=engine)
+# Verify all database artifacts are in place before serving any traffic.
+# If anything is missing, the app will refuse to start with a clear error.
+verify_ready()
 
 app = FastAPI(
     title="Semantic Document Search",

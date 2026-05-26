@@ -21,13 +21,13 @@ Notes:
     - ✅requirements.txt with the necessary packages
     - ✅script to create and activate venv
     - ✅config for embeddings and reranker models, db files paths
-2. Implement methods for:
+2. ✅Implement methods for:
     - ✅embeddings generation - ==**CHUNKING!!!**== -> recursive: heading -> section -> paragraph -> sentence -> tokens, respecting headings, code blocks, bullet lists, tables. 500 tokens, 100 tokens overlap. PyMuPDF
     - ✅store in LanceDB and SQLite (no index update at this point!)
-    - vector + fts search
-    - reranking
-3. Script to seed 10k documents
-    - Wikipedia
+    - ✅vector + fts search
+    - ✅reranking
+3. ✅Script to seed 10k documents
+    - ✅Wikipedia - 10k documents (78076 chunks) in 16972s
     - ✅Hugging Face BEIR - msmarco -> insert 10k documents (10k chunks, 30-90tokens) in 644s
 4. Index updates on insert/update/delete
     - index update after X changes or X time
@@ -45,3 +45,5 @@ Notes:
 4. Dynamic chunk size - analyze the document if it is more of short statements/facts(FAQs, support docs, short ansers) or long statements (conceptual docs, fiction writing). Small chunks = ⬆️precision, ⬆️reranker quality, ⬇️context loss, ⬇️vectors/storage. Large chunks = ⬆️context, ⬆️vectors/storage, ⬇️semantic delusion, ⬇️ANN precision, ⬇️reranker noise, ⬇️latency
 5. Multilangual native support - depending on quality and if we have enough resources we may check if using the native language of the document/query gives significantly better results.
 6. Replace PyMuPDF with unstructured.io for more complex analysis.
+6.a - Consider different chunkers/splitters for different sources.
+7. In case we keep LanceDB for 10M documents we have to review non-HNSW indexes. They require more training and fine-tuning, but they use less memory and are faster.

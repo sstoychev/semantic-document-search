@@ -42,18 +42,45 @@ def download_embedding_model() -> None:
     print(f"  Downloading embedding model: {model_name} ...")
     from sentence_transformers import SentenceTransformer
     SentenceTransformer(model_name)
-
     print(f"  Embedding model ready.")
+
+
+def download_rerank_model() -> None:
+    """Pre-download the cross-encoder reranking model."""
+    from app.config import settings
+
+    model_name = settings.rerank_model
+    print(f"  Downloading cross-encoder: {model_name} ...")
+    from sentence_transformers import CrossEncoder
+    CrossEncoder(model_name)
+    print(f"  Cross-encoder ready.")
+
+
+def init_fts_index() -> None:
+    """Create SQLite FTS5 virtual table + triggers (idempotent)."""
+    from app.database import ensure_fts_index
+    ensure_fts_index()
+    print("  SQLite FTS5 index ready.")
+
+
+def init_vector_index() -> None:
+    """Create LanceDB IVF_PQ vector index if enough data exists (idempotent)."""
+    from app.database import ensure_lance_index
+    ensure_lance_index()
+    print("  LanceDB vector index ready (or skipped — no data yet).")
 
 
 def main() -> None:
     print("Initialising databases ...")
     init_sqlite()
     init_lancedb()
+    init_fts_index()
+    init_vector_index()
     print("Done.\n")
 
     print("Downloading models ...")
     download_embedding_model()
+    download_rerank_model()
     print("Done.")
 
 
