@@ -29,8 +29,8 @@ Notes:
 3. ✅Script to seed 10k documents
     - ✅Wikipedia - 10k documents (78076 chunks) in 16972s
     - ✅Hugging Face BEIR - msmarco -> insert 10k documents (10k chunks, 30-90tokens) in 644s
-4. Index updates on insert/update/delete
-    - index update after X changes or X time
+4. ☑️Index updates on insert/update/delete
+    - ✅index update after X changes or X time
     - main + delta index
 5. Authorisation/Authentication
     - ✅master password set at project initialization

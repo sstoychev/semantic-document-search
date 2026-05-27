@@ -187,6 +187,8 @@ def _store_sqlite_batch(
                 db.flush()  # populate chunk_db.id
                 records.append((chunk_db.id, doc_db.id, chunk.embedding_input))
 
+            doc_db.is_indexed = True
+
         db.commit()
     except Exception:
         db.rollback()

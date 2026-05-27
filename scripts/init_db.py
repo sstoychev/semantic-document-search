@@ -6,6 +6,8 @@ Runs after scripts/setup_config.py so that config.ini is already in place.
 import sys
 from pathlib import Path
 
+from sqlalchemy import text
+
 # Put the project root on sys.path so `app` can be imported.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -19,6 +21,23 @@ def init_sqlite() -> None:
 
     Base.metadata.create_all(bind=engine)
     print("  SQLite tables ready.")
+
+
+def ensure_document_indexing_schema() -> None:
+    """Add/repair document indexing state columns for existing databases."""
+    from app.database import engine
+
+    with engine.begin() as conn:
+        columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(documents)")).fetchall()
+        }
+        if "is_indexed" not in columns:
+            conn.execute(text("ALTER TABLE documents ADD COLUMN is_indexed INTEGER NOT NULL DEFAULT 1"))
+            print("  Added documents.is_indexed column.")
+        conn.execute(text("UPDATE documents SET is_indexed = 1 WHERE is_indexed IS NULL"))
+        conn.execute(text("DROP INDEX IF EXISTS ix_documents_is_indexed"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_documents_pending_documents ON documents (id) WHERE is_indexed = 0"))
 
 
 def init_lancedb() -> None:
@@ -73,6 +92,7 @@ def init_vector_index() -> None:
 def main() -> None:
     print("Initialising databases ...")
     init_sqlite()
+    ensure_document_indexing_schema()
     init_lancedb()
     init_fts_index()
     init_vector_index()

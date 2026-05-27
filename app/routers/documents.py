@@ -7,12 +7,14 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.chunker import get_blocks
+from app.config import settings
 from app.database import get_db
 from app.schemas.document import (
     DocumentResponse,
     DocumentUpdate,
     SearchQuery,
     SearchResult,
+    UploadBatchResponse,
 )
 from app.services.document_service import document_service
 
@@ -23,61 +25,108 @@ _MAX_UPLOAD_BYTES = 200 * 1024
 _UPLOAD_DIR = Path("data/uploads")
 
 
-@router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
-async def upload_document(response: Response, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Upload a file, validate type/size, persist it, and index it."""
+@router.post("/upload", response_model=UploadBatchResponse, status_code=status.HTTP_201_CREATED)
+async def upload_document(response: Response, files: list[UploadFile] = File(...), db: Session = Depends(get_db)):
+    """Upload up to 10 files, validate type/size, persist them, and index once if needed."""
     total_start = time.perf_counter()
 
+    if not files:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No files were uploaded")
+    if len(files) > 10:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You can upload at most 10 files at once")
+
+    pending_before = document_service.pending_documents_count(db)
+    threshold = int(settings.pending_reindex_threshold)
+
     t0 = time.perf_counter()
-    filename = (file.filename or "").strip()
-    if not filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing file name")
-
-    suffix = Path(filename).suffix.lower()
-    if suffix not in _ALLOWED_EXTENSIONS:
-        allowed = ", ".join(sorted(_ALLOWED_EXTENSIONS))
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type: {suffix or '(none)'}. Allowed: {allowed}",
-        )
-    validate_ms = (time.perf_counter() - t0) * 1000.0
-
-    t1 = time.perf_counter()
-    content = await file.read()
-    read_ms = (time.perf_counter() - t1) * 1000.0
-
-    t2 = time.perf_counter()
-    size = len(content)
-    if size == 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty")
-    if size > _MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large: {size} bytes. Max allowed is {_MAX_UPLOAD_BYTES} bytes",
-        )
+    validated_files: list[tuple[str, Path, bytes]] = []
+    validate_ms_total = 0.0
+    read_ms_total = 0.0
+    save_ms_total = 0.0
+    index_ms_total = 0.0
+    reindex_ms = 0.0
 
     _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    safe_name = Path(filename).name
-    target = (_UPLOAD_DIR / safe_name).resolve()
-    target.write_bytes(content)
-    save_ms = (time.perf_counter() - t2) * 1000.0
+    for file in files:
+        validate_start = time.perf_counter()
+        filename = (file.filename or "").strip()
+        if not filename:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing file name")
 
-    t3 = time.perf_counter()
-    try:
-        doc = document_service.create_from_path(db, target, name=safe_name)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    index_ms = (time.perf_counter() - t3) * 1000.0
+        suffix = Path(filename).suffix.lower()
+        if suffix not in _ALLOWED_EXTENSIONS:
+            allowed = ", ".join(sorted(_ALLOWED_EXTENSIONS))
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file type: {suffix or '(none)'}. Allowed: {allowed}",
+            )
+        validate_ms_total += (time.perf_counter() - validate_start) * 1000.0
+
+        read_start = time.perf_counter()
+        content = await file.read()
+        read_ms_total += (time.perf_counter() - read_start) * 1000.0
+
+        size = len(content)
+        if size == 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Uploaded file is empty: {filename}")
+        if size > _MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File too large: {filename} is {size} bytes. Max allowed is {_MAX_UPLOAD_BYTES} bytes",
+            )
+
+        safe_name = Path(filename).name
+        target = (_UPLOAD_DIR / safe_name).resolve()
+        validated_files.append((safe_name, target, content))
+
+    file_items: list[DocumentResponse] = []
+    for safe_name, target, content in validated_files:
+        save_start = time.perf_counter()
+        target.write_bytes(content)
+        save_ms_total += (time.perf_counter() - save_start) * 1000.0
+
+        index_start = time.perf_counter()
+        try:
+            doc = document_service.create_from_path(db, target, name=safe_name)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        index_ms_total += (time.perf_counter() - index_start) * 1000.0
+
+        file_items.append(DocumentResponse.model_validate(doc))
+
+    reindex_start = time.perf_counter()
+    reindex_info = document_service.reindex_pending_documents_if_needed(db)
+    reindex_ms = (time.perf_counter() - reindex_start) * 1000.0
+    pending_after = int(reindex_info.get("pending_after", pending_before))
+    indexed_now = bool(reindex_info.get("indexed_now"))
+    reindexed_count = int(reindex_info.get("reindexed_count", 0))
+
+    if indexed_now:
+        for item in file_items:
+            item.is_indexed = True
 
     total_ms = (time.perf_counter() - total_start) * 1000.0
-    response.headers["X-Debug-Upload-Validate-Ms"] = f"{validate_ms:.3f}"
-    response.headers["X-Debug-Upload-Read-Ms"] = f"{read_ms:.3f}"
-    response.headers["X-Debug-Upload-Save-Ms"] = f"{save_ms:.3f}"
-    response.headers["X-Debug-Upload-Index-Ms"] = f"{index_ms:.3f}"
+    response.headers["X-Debug-Upload-Validate-Ms"] = f"{validate_ms_total:.3f}"
+    response.headers["X-Debug-Upload-Read-Ms"] = f"{read_ms_total:.3f}"
+    response.headers["X-Debug-Upload-Save-Ms"] = f"{save_ms_total:.3f}"
+    response.headers["X-Debug-Upload-Index-Ms"] = f"{index_ms_total:.3f}"
+    response.headers["X-Debug-Upload-Reindex-Ms"] = f"{reindex_ms:.3f}"
     response.headers["X-Debug-Upload-Total-Ms"] = f"{total_ms:.3f}"
+    response.headers["X-Debug-Upload-Indexed-Now"] = str(indexed_now)
+    response.headers["X-Debug-Upload-Pending-Before"] = str(pending_before)
+    response.headers["X-Debug-Upload-Pending-After"] = str(pending_after)
+    response.headers["X-Debug-Upload-Threshold"] = str(threshold)
+    response.headers["X-Debug-Upload-Reindexed-Count"] = str(reindexed_count)
 
-    return doc
+    return UploadBatchResponse(
+        files=file_items,
+        indexed_now=indexed_now,
+        pending_before=pending_before,
+        pending_after=pending_after,
+        threshold=threshold,
+        reindexed_count=reindexed_count,
+    )
 
 
 @router.get("/", response_model=list[DocumentResponse])
@@ -113,7 +162,7 @@ def view_document(document_id: int, db: Session = Depends(get_db)):
         if doc is None:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-        path = Path(doc.document_path)
+        path = Path(str(doc.document_path))
         if not path.exists() or not path.is_file():
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found on server")
 
@@ -123,7 +172,7 @@ def view_document(document_id: int, db: Session = Depends(get_db)):
         except Exception:
                 full_text = path.read_text(encoding="utf-8", errors="replace")
 
-        title = escape(doc.name)
+        title = escape(str(doc.name))
         body = escape(full_text)
         project_root = Path.cwd().resolve()
         try:

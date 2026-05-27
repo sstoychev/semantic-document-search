@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Boolean, Column, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -10,6 +10,7 @@ class Document(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     document_path = Column(String, nullable=False, unique=True, index=True)
     name = Column(String, nullable=False)
+    is_indexed = Column(Boolean, nullable=False, default=False, server_default="0")
 
     chunks = relationship(
         "Chunk",

@@ -138,6 +138,13 @@ def verify_ready() -> None:
             if row is None:
                 errors.append(f"SQLite table '{table_name}' is missing")
 
+        document_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(documents)")).fetchall()
+        }
+        if "is_indexed" not in document_columns:
+            errors.append("SQLite column 'documents.is_indexed' is missing")
+
         for trigger in ("chunks_ai", "chunks_ad", "chunks_au"):
             row = conn.execute(
                 text("SELECT name FROM sqlite_master WHERE type='trigger' AND name=:n"),

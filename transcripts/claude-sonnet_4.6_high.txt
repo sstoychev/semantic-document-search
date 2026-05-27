@@ -322,3 +322,22 @@ A search is performed in about 6.5s, 5.7s are for "rest". Remove rest, add all s
 In demo/add I want to see debug too - total time and split for each step.
 
 --------------
+
+Currently we reindex on every document. Reindexing takes a lot of time (3s at the moment). I want to change this, I want to reindex after X added files (configurable, default 10). We may keep the new vectors in another table and insert +reindex when >= X. We may use another aproach too, not table, if there is a better alternative.
+In future there will be periodic script to check for pending documents for reindex.
+In demo/add we shoud see if reindex has happened or not.
+We should not reindex in the middle of adding documents. For example if we have 7 pending documents and we add 5 we will reindex after we add all 5, not after 3 and the rest 2 to be pending.
+
+--------------
+
+The new index is for all documents, which is not needed. Make it partial, because we only search for false.
+
+--------------
+
+I want to be able to upload multiple documents, max =10
+
+--------------
+
+We have Upload and UploadBatch. I want to have only the batch version. If we have only one document we simply have batch of one document. Clean up what is not necessary
+
+--------------

@@ -26,6 +26,9 @@ class Settings:
     max_workers: int = _cfg.getint("chunking", "max_workers", fallback=5)
     batch_size: int = _cfg.getint("chunking", "batch_size", fallback=100)
 
+    # Indexing / reindexing
+    pending_reindex_threshold: int = _cfg.getint("indexing", "pending_reindex_threshold", fallback=10)
+
     # Embedding
     embedding_model: str = _cfg.get("embedding", "model", fallback="BAAI/bge-small-en-v1.5")
     rerank_model: str = _cfg.get("embedding", "rerank_model", fallback="cross-encoder/ms-marco-MiniLM-L-6-v2")

@@ -180,8 +180,8 @@ def demo_page() -> str:
         </section>
 
         <section id="panel-add" class="panel hidden">
-            <input id="file" type="file" accept=".txt,.md,.docx,.pdf,.html,.htm" />
-            <div class="hint">Allowed: txt, md, docx, pdf, html, htm. Max size: 200KB.</div>
+            <input id="file" type="file" accept=".txt,.md,.docx,.pdf,.html,.htm" multiple />
+            <div class="hint">Allowed: txt, md, docx, pdf, html, htm. Max size: 200KB each. You can select up to 10 files.</div>
             <div style="margin-top:10px;">
                 <button id="btn-add" type="button">Upload & Index</button>
             </div>
@@ -279,33 +279,42 @@ def demo_page() -> str:
         const allowed = ['txt', 'md', 'docx', 'pdf', 'html', 'htm'];
 
         async function uploadFile() {
-            const file = fileInput.files[0];
-            if (!file) {
-                addStatus.textContent = 'Please choose a file.';
+            const files = Array.from(fileInput.files || []);
+            if (!files.length) {
+                addStatus.textContent = 'Please choose one or more files.';
+                addStatus.className = 'status err';
+                return;
+            }
+            if (files.length > 10) {
+                addStatus.textContent = 'You can upload at most 10 files at once.';
                 addStatus.className = 'status err';
                 return;
             }
 
-            const ext = (file.name.split('.').pop() || '').toLowerCase();
-            if (!allowed.includes(ext)) {
-                addStatus.textContent = 'Unsupported type. Allowed: ' + allowed.join(', ');
-                addStatus.className = 'status err';
-                return;
-            }
-            if (file.size > maxBytes) {
-                addStatus.textContent = `File too large (${file.size} bytes). Max is ${maxBytes} bytes.`;
-                addStatus.className = 'status err';
-                return;
+            for (const file of files) {
+                const ext = (file.name.split('.').pop() || '').toLowerCase();
+                if (!allowed.includes(ext)) {
+                    addStatus.textContent = 'Unsupported type. Allowed: ' + allowed.join(', ');
+                    addStatus.className = 'status err';
+                    return;
+                }
+                if (file.size > maxBytes) {
+                    addStatus.textContent = `File too large (${file.name}: ${file.size} bytes). Max is ${maxBytes} bytes.`;
+                    addStatus.className = 'status err';
+                    return;
+                }
             }
 
             addBtn.disabled = true;
-            addStatus.textContent = 'Uploading and indexing...';
+            addStatus.textContent = `Uploading and indexing ${files.length} file(s)...`;
             addStatus.className = 'status';
             const startedAt = performance.now();
 
             try {
                 const form = new FormData();
-                form.append('file', file);
+                for (const file of files) {
+                    form.append('files', file);
+                }
 
                 const res = await fetch('/documents/upload', {
                     method: 'POST',
@@ -319,16 +328,27 @@ def demo_page() -> str:
                 const readMs = Number(res.headers.get('X-Debug-Upload-Read-Ms') || '0');
                 const saveMs = Number(res.headers.get('X-Debug-Upload-Save-Ms') || '0');
                 const indexMs = Number(res.headers.get('X-Debug-Upload-Index-Ms') || '0');
+                const reindexMs = Number(res.headers.get('X-Debug-Upload-Reindex-Ms') || '0');
                 const totalMs = Number(res.headers.get('X-Debug-Upload-Total-Ms') || '0');
+                const indexedNow = (res.headers.get('X-Debug-Upload-Indexed-Now') || 'false') === 'true';
+                const pendingBefore = Number(res.headers.get('X-Debug-Upload-Pending-Before') || '0');
+                const pendingAfter = Number(res.headers.get('X-Debug-Upload-Pending-After') || '0');
+                const threshold = Number(res.headers.get('X-Debug-Upload-Threshold') || '0');
+                const reindexedCount = Number(res.headers.get('X-Debug-Upload-Reindexed-Count') || '0');
+                const fileSummary = (data.files || []).map((item) => item.name).join(', ');
 
                 addStatus.textContent =
-                    `Indexed: ${data.name} (document id ${data.id}) ` +
+                    `${indexedNow ? 'Reindexed now' : 'Queued for reindex'}: ${fileSummary} ` +
+                    `| files: ${(data.files || []).length} ` +
+                    `| pending: ${pendingBefore} → ${pendingAfter} (threshold ${threshold}) ` +
+                    `| reindexed docs: ${reindexedCount} ` +
                     `| elapsed: ${elapsedMs.toFixed(1)} ms ` +
                     `| server total: ${totalMs.toFixed(1)} ms ` +
                     `| validate: ${validateMs.toFixed(1)} ms ` +
                     `| read: ${readMs.toFixed(1)} ms ` +
                     `| save: ${saveMs.toFixed(1)} ms ` +
-                    `| index: ${indexMs.toFixed(1)} ms`;
+                    `| pending-index: ${indexMs.toFixed(1)} ms ` +
+                    `| reindex: ${reindexMs.toFixed(1)} ms`;
                 addStatus.className = 'status ok';
                 fileInput.value = '';
             } catch (err) {

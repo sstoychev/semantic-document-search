@@ -6,6 +6,10 @@ lancedb_uri = ./data/lancedb
 ; Root directory for downloaded datasets (relative to project root or absolute)
 datasets_dir = data/datasets
 
+[indexing]
+; Reindex queued uploads only after this many pending files exist
+pending_reindex_threshold = 10
+
 [chunking]
 ; Target token count per chunk (approximate — never splits code/tables/lists)
 chunk_tokens = 500

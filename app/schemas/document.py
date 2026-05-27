@@ -16,6 +16,7 @@ class DocumentUpdate(BaseModel):
 
 class DocumentResponse(DocumentBase):
     id: int
+    is_indexed: bool
 
     model_config = {"from_attributes": True}
 
@@ -24,6 +25,15 @@ class SearchQuery(BaseModel):
     query: str
     limit: int = 10
     debug: bool = False
+
+
+class UploadBatchResponse(BaseModel):
+    files: list[DocumentResponse]
+    indexed_now: bool
+    pending_before: int
+    pending_after: int
+    threshold: int
+    reindexed_count: int = 0
 
 
 class SearchResult(BaseModel):
