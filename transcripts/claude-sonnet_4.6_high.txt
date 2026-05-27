@@ -365,3 +365,15 @@ Add the necessary changes to all API methods and the demo page.
 Create user "***************" with password "***********" and only read permissions in the database.
 
 --------------
+
+Review the README and fix anything inaccurate a typos.
+
+--------------
+
+Add part for the tests and the project structure being modular - db engine, models etc can be swapped. Confirm this.
+
+--------------
+
+In the modular structure not being zero-change add note for changing the models - it would require embeding size tuning, etc..
+
+--------------
