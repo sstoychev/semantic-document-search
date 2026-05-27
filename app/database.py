@@ -130,7 +130,7 @@ def verify_ready() -> None:
 
     # SQLite: ORM tables + FTS5 table + triggers
     with engine.connect() as conn:
-        for table_name in ("documents", "chunks", "chunks_fts"):
+        for table_name in ("documents", "chunks", "chunks_fts", "users"):
             row = conn.execute(
                 text("SELECT name FROM sqlite_master WHERE type='table' AND name=:n"),
                 {"n": table_name},

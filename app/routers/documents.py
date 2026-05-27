@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.chunker import get_blocks
 from app.config import settings
 from app.database import get_db
+from app.dependencies import require_permission, require_permission_view
+from app.permissions import PERM_CREATE, PERM_DELETE, PERM_READ, PERM_UPDATE
 from app.schemas.document import (
     DocumentResponse,
     DocumentUpdate,
@@ -26,7 +28,12 @@ _UPLOAD_DIR = Path("data/uploads")
 
 
 @router.post("/upload", response_model=UploadBatchResponse, status_code=status.HTTP_201_CREATED)
-async def upload_document(response: Response, files: list[UploadFile] = File(...), db: Session = Depends(get_db)):
+async def upload_document(
+    response: Response,
+    files: list[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_permission(PERM_CREATE)),
+):
     """Upload up to 10 files, validate type/size, persist them, and index once if needed."""
     total_start = time.perf_counter()
 
@@ -134,13 +141,19 @@ def list_documents(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=1000),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_permission(PERM_READ)),
 ):
     """List indexed documents."""
     return document_service.get_many(db, skip=skip, limit=limit)
 
 
 @router.post("/search", response_model=list[SearchResult])
-def search_documents(query: SearchQuery, response: Response, db: Session = Depends(get_db)):
+def search_documents(
+    query: SearchQuery,
+    response: Response,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_permission(PERM_READ)),
+):
     """Perform semantic search across stored documents."""
     results, timings = document_service.search(db, query)
     if query.debug and timings:
@@ -156,7 +169,11 @@ def search_documents(query: SearchQuery, response: Response, db: Session = Depen
 
 
 @router.get("/{document_id}/view", response_class=HTMLResponse)
-def view_document(document_id: int, db: Session = Depends(get_db)):
+def view_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_permission_view(PERM_READ)),
+):
         """Render one specific document in a dedicated page."""
         doc = document_service.get(db, document_id)
         if doc is None:
@@ -207,7 +224,11 @@ def view_document(document_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-def get_document(document_id: int, db: Session = Depends(get_db)):
+def get_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_permission(PERM_READ)),
+):
     doc = document_service.get(db, document_id)
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
@@ -215,7 +236,12 @@ def get_document(document_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{document_id}", response_model=DocumentResponse)
-def update_document(document_id: int, payload: DocumentUpdate, db: Session = Depends(get_db)):
+def update_document(
+    document_id: int,
+    payload: DocumentUpdate,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_permission(PERM_UPDATE)),
+):
     """Update editable document metadata."""
     doc = document_service.update(db, document_id, payload)
     if doc is None:
@@ -224,7 +250,11 @@ def update_document(document_id: int, payload: DocumentUpdate, db: Session = Dep
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document(document_id: int, db: Session = Depends(get_db)):
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_permission(PERM_DELETE)),
+):
     deleted = document_service.delete(db, document_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")

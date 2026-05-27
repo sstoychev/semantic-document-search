@@ -32,11 +32,11 @@ Notes:
 4. ☑️Index updates on insert/update/delete
     - ✅index update after X changes or X time
     - main + delta index
-5. Authorisation/Authentication
+5. ✅Authorisation/Authentication
     - ✅master password set at project initialization
-    - login API methods
-    - users creation with permissions
-    - JWT with salt for permission groups. Salt reset/invalidation for token revocation.
+    - ✅login API methods
+    - ✅users creation with permissions
+    - ✅JWT with salt for permission groups. Salt reset/invalidation for token revocation.
 
 # Further future improvements
 1. Review used packages/libraries and remove ones, which are used very little, with custom code. This is for security reasons
@@ -47,3 +47,4 @@ Notes:
 6. Replace PyMuPDF with unstructured.io for more complex analysis.
 6.a - Consider different chunkers/splitters for different sources.
 7. In case we keep LanceDB for 10M documents we have to review non-HNSW indexes. They require more training and fine-tuning, but they use less memory and are faster.
+8. Reindexing - HNSW indexes in PostgreSQL+pgvector are always up-to-date after insert/update. This is not the case with LanceDB and could be a problem if we have frequest modifications.

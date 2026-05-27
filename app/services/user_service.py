@@ -1,82 +1,113 @@
+"""User authentication and management helpers."""
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
+
+from jose import jwt
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.user import User
-from app.schemas.user import UserCreate, UserUpdate
+from app.permissions import PERM_ALL
+
+ADMIN_USERNAME = "document-admin"
 
 
-class UserService:
-    # ------------------------------------------------------------------
-    # CRUD
-    # ------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Password helpers
+# ---------------------------------------------------------------------------
 
-    def create(self, db: Session, payload: UserCreate) -> User:
-        """
-        Persist a new user.
-        TODO: hash password with passlib before storing.
-        """
-        db_user = User(
-            username=payload.username,
-            email=payload.email,
-            hashed_password=payload.password,  # TODO: replace with hashed value
-        )
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
-        return db_user
-
-    def get(self, db: Session, user_id: int) -> User | None:
-        """Retrieve a single user by primary key."""
-        return db.query(User).filter(User.id == user_id).first()
-
-    def get_by_username(self, db: Session, username: str) -> User | None:
-        """Retrieve a user by username."""
-        return db.query(User).filter(User.username == username).first()
-
-    def get_by_email(self, db: Session, email: str) -> User | None:
-        """Retrieve a user by email."""
-        return db.query(User).filter(User.email == email).first()
-
-    def get_many(self, db: Session, skip: int = 0, limit: int = 100) -> list[User]:
-        """Return a paginated list of users."""
-        return db.query(User).offset(skip).limit(limit).all()
-
-    def update(self, db: Session, user_id: int, payload: UserUpdate) -> User | None:
-        """
-        Update user fields.
-        TODO: hash new password if provided.
-        """
-        db_user = self.get(db, user_id)
-        if db_user is None:
-            return None
-        for field, value in payload.model_dump(exclude_unset=True, exclude_none=True).items():
-            setattr(db_user, field, value)
-        db.commit()
-        db.refresh(db_user)
-        return db_user
-
-    def delete(self, db: Session, user_id: int) -> bool:
-        """Remove a user."""
-        db_user = self.get(db, user_id)
-        if db_user is None:
-            return False
-        db.delete(db_user)
-        db.commit()
-        return True
-
-    # ------------------------------------------------------------------
-    # Auth helpers
-    # ------------------------------------------------------------------
-
-    def authenticate(self, db: Session, username: str, password: str) -> User | None:
-        """
-        Verify credentials and return the user if valid.
-        TODO: verify password against stored hash using passlib.
-        """
-        user = self.get_by_username(db, username)
-        if user is None:
-            return None
-        # TODO: replace with: if not pwd_context.verify(password, user.hashed_password): return None
-        return user
+def hash_password(password: str, salt: str) -> str:
+    """Return SHA-256 hex digest of (password + salt)."""
+    return hashlib.sha256((password + salt).encode()).hexdigest()
 
 
-user_service = UserService()
+def _admin_password_hash() -> str:
+    """Deterministic hash of the admin password (for JWT secret derivation)."""
+    return hashlib.sha256(settings.admin_password.encode()).hexdigest()
+
+
+def _admin_jwt_secret() -> str:
+    return _admin_password_hash() + settings.admin_jwt_salt
+
+
+def _user_jwt_secret(user: User) -> str:
+    return user.password_hash + user.jwt_salt
+
+
+# ---------------------------------------------------------------------------
+# Token helpers
+# ---------------------------------------------------------------------------
+
+def create_token(username: str, permissions: int, jwt_secret: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.access_token_expire_minutes
+    )
+    payload = {"sub": username, "permissions": permissions, "exp": expire}
+    return jwt.encode(payload, jwt_secret, algorithm=settings.algorithm)
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+def authenticate_user(
+    db: Session, username: str, password: str
+) -> tuple[str, int, str] | None:
+    """Verify credentials.
+
+    Returns ``(username, permissions, jwt_secret)`` on success, else ``None``.
+    """
+    if username == ADMIN_USERNAME:
+        if password == settings.admin_password:
+            return (username, PERM_ALL, _admin_jwt_secret())
+        return None
+
+    user = db.query(User).filter(User.username == username).first()
+    if user is None:
+        return None
+    if hash_password(password, user.salt) != user.password_hash:
+        return None
+    return (username, int(user.permissions), _user_jwt_secret(user))
+
+
+def get_user_jwt_secret(db: Session, username: str) -> str | None:
+    """Return the JWT signing/verifying secret for *username*, or ``None``."""
+    if username == ADMIN_USERNAME:
+        return _admin_jwt_secret()
+    user = db.query(User).filter(User.username == username).first()
+    if user is None:
+        return None
+    return _user_jwt_secret(user)
+
+
+# ---------------------------------------------------------------------------
+# CRUD
+# ---------------------------------------------------------------------------
+
+def create_user(
+    db: Session, username: str, password: str, permissions: int = 1
+) -> User:
+    """Create a new user with a securely salted password."""
+    salt = secrets.token_hex(16)
+    jwt_salt = secrets.token_hex(16)
+    user = User(
+        username=username,
+        password_hash=hash_password(password, salt),
+        salt=salt,
+        permissions=permissions,
+        jwt_salt=jwt_salt,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+user_service = type("_UserService", (), {
+    "create": staticmethod(create_user),
+    "get_by_username": staticmethod(
+        lambda db, username: db.query(User).filter(User.username == username).first()
+    ),
+    "authenticate": staticmethod(authenticate_user),
+})()

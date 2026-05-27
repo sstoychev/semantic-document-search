@@ -341,3 +341,27 @@ I want to be able to upload multiple documents, max =10
 We have Upload and UploadBatch. I want to have only the batch version. If we have only one document we simply have batch of one document. Clean up what is not necessary
 
 --------------
+
+I want user management.
+- the admin username should be "***********" if anyone tries to log with it we should compare versus the password we've set in config.ini. The admin always have all persmissions.
+
+The users should have persmission - bitmask.
+Read- 1 (always)
+Create - 2
+Update - 3
+Delete - 4
+
+In fugure we may add more permissions.
+The users should have:
+- username
+- password+salt
+- permissions
+- jwt_salt
+
+For JWT secret we should use password + jwt_salt.
+
+Add the necessary changes to all API methods and the demo page.
+
+Create user "***************" with password "***********" and only read permissions in the database.
+
+--------------

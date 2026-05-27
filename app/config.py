@@ -34,12 +34,11 @@ class Settings:
     rerank_model: str = _cfg.get("embedding", "rerank_model", fallback="cross-encoder/ms-marco-MiniLM-L-6-v2")
 
     # Auth
-    secret_key: str = _cfg.get("auth", "secret_key", fallback="change-me-in-production")
     algorithm: str = _cfg.get("auth", "algorithm", fallback="HS256")
-    access_token_expire_minutes: int = _cfg.getint("auth", "access_token_expire_minutes", fallback=30)
-    admin_username: str = _cfg.get("auth", "admin_username", fallback="admin")
-    admin_hashed_password: str = _cfg.get("auth", "admin_hashed_password", fallback="")
-    admin_salt: str = _cfg.get("auth", "admin_salt", fallback="")
+    access_token_expire_minutes: int = _cfg.getint("auth", "access_token_expire_minutes", fallback=60)
+    # Admin user is always "document-admin"; password stored here as plain text
+    admin_password: str = _cfg.get("auth", "admin_password", fallback="change-me-in-production")
+    admin_jwt_salt: str = _cfg.get("auth", "admin_jwt_salt", fallback="change-me-admin-jwt-salt")
 
 
 settings = Settings()

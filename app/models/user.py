@@ -8,6 +8,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
-    email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    is_active = Column(Integer, default=1)
+    password_hash = Column(String, nullable=False)
+    salt = Column(String, nullable=False)
+    permissions = Column(Integer, nullable=False, default=1)  # bitmask; see app/permissions.py
+    jwt_salt = Column(String, nullable=False)  # JWT secret = password_hash + jwt_salt
