@@ -382,3 +382,7 @@ I'm testing the complete setup process. In config.ini admin_username is set to a
 Also - after seeding the database with msmarco/wikipedia are the documents properly indexed?
 
 --------------
+
+Can we not store the plain password, but rather the hashed value? No need to implement backward compatibity.
+
+--------------

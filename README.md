@@ -140,3 +140,4 @@ The structure is modular enough to swap storage and indexing backends, but it is
 
 1. The project was developed on CPU-only hardware - 8GB RAM, 4 cores.
 2. Embedding, reranking, and indexing are significantly faster with GPUs and tuned runtime settings.
+3. The demo page shows timing breakdowns for search and upload operations (via debug response headers), which helps with profiling and tuning.
