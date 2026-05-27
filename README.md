@@ -18,7 +18,7 @@ Proof-of-concept semantic document search for local usage.
     source .venv/bin/activate
     ```
 4. Review auth settings in config.ini and set a real admin password before non-local usage:
-    - auth.admin_password
+    - auth.admin_password_hash
     - auth.admin_jwt_salt
 5. Optionally seed data with MSMARCO or Wikipedia:
     ```bash

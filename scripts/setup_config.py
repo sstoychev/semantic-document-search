@@ -6,6 +6,7 @@ Uses only the Python standard library — safe to run before pip install.
 """
 import configparser
 import getpass
+import hashlib
 import secrets
 import shutil
 from pathlib import Path
@@ -44,7 +45,7 @@ def main() -> None:
         cfg["auth"] = {}
 
     # Admin username is fixed in code to "document-admin".
-    cfg["auth"]["admin_password"] = password
+    cfg["auth"]["admin_password_hash"] = hashlib.sha256(password.encode()).hexdigest()
     cfg["auth"]["admin_jwt_salt"] = secrets.token_hex(32)
 
     with CONFIG_FILE.open("w") as fh:

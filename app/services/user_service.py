@@ -2,6 +2,7 @@
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+from typing import cast
 
 from jose import jwt
 from sqlalchemy.orm import Session
@@ -23,8 +24,8 @@ def hash_password(password: str, salt: str) -> str:
 
 
 def _admin_password_hash() -> str:
-    """Deterministic hash of the admin password (for JWT secret derivation)."""
-    return hashlib.sha256(settings.admin_password.encode()).hexdigest()
+    """Return configured admin password hash."""
+    return settings.admin_password_hash
 
 
 def _admin_jwt_secret() -> str:
@@ -32,7 +33,9 @@ def _admin_jwt_secret() -> str:
 
 
 def _user_jwt_secret(user: User) -> str:
-    return user.password_hash + user.jwt_salt
+    password_hash = cast(str, user.password_hash)
+    jwt_salt = cast(str, user.jwt_salt)
+    return password_hash + jwt_salt
 
 
 # ---------------------------------------------------------------------------
@@ -59,16 +62,19 @@ def authenticate_user(
     Returns ``(username, permissions, jwt_secret)`` on success, else ``None``.
     """
     if username == ADMIN_USERNAME:
-        if password == settings.admin_password:
+        if hashlib.sha256(password.encode()).hexdigest() == _admin_password_hash():
             return (username, PERM_ALL, _admin_jwt_secret())
         return None
 
     user = db.query(User).filter(User.username == username).first()
     if user is None:
         return None
-    if hash_password(password, user.salt) != user.password_hash:
+    salt = cast(str, user.salt)
+    password_hash = cast(str, user.password_hash)
+    permissions = cast(int, user.permissions)
+    if hash_password(password, salt) != password_hash:
         return None
-    return (username, int(user.permissions), _user_jwt_secret(user))
+    return (username, permissions, _user_jwt_secret(user))
 
 
 def get_user_jwt_secret(db: Session, username: str) -> str | None:

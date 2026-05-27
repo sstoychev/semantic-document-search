@@ -1,0 +1,15 @@
+[database]
+sqlite_url = sqlite:///./data/app.sqlite3
+lancedb_uri = ./data/lancedb
+
+[data]
+datasets_dir = data/datasets
+
+[indexing]
+pending_reindex_threshold = 10
+
+[auth]
+algorithm = HS256
+access_token_expire_minutes = 60
+admin_password = change-me-in-production
+admin_jwt_salt = 16fbf731bce125566b21bc6f2edf2da73d2bd0c0018b5640

@@ -29,5 +29,5 @@ algorithm = HS256
 access_token_expire_minutes = 60
 ; Admin username is fixed in code to: document-admin
 ; Populated by setup_venv.sh
-admin_password =
+admin_password_hash =
 admin_jwt_salt =

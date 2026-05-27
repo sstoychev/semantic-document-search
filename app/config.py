@@ -1,4 +1,5 @@
 import configparser
+import hashlib
 from pathlib import Path
 
 _CONFIG_FILE = Path("config.ini")
@@ -36,8 +37,12 @@ class Settings:
     # Auth
     algorithm: str = _cfg.get("auth", "algorithm", fallback="HS256")
     access_token_expire_minutes: int = _cfg.getint("auth", "access_token_expire_minutes", fallback=60)
-    # Admin user is always "document-admin"; password stored here as plain text
-    admin_password: str = _cfg.get("auth", "admin_password", fallback="change-me-in-production")
+    # Admin user is always "document-admin"; only hash is stored in config.
+    admin_password_hash: str = _cfg.get(
+        "auth",
+        "admin_password_hash",
+        fallback=hashlib.sha256("change-me-in-production".encode()).hexdigest(),
+    )
     admin_jwt_salt: str = _cfg.get("auth", "admin_jwt_salt", fallback="change-me-admin-jwt-salt")
 
 
