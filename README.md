@@ -28,8 +28,8 @@ Proof-of-concept semantic document search for local usage.
     ```bash
     python scripts/load_wikipedia.py
     ```
-    - MSMARCO loads much faster but documents are small/simplified.
-    - Wikipedia takes much longer on CPU-only machines and is closer to real-world content.
+    - MSMARCO loads much faster (650s) but documents are small/simplified.
+    - Wikipedia takes much longer (17 000s) on CPU-only machines and is closer to real-world content.
 6. Start the server:
     ```bash
     uvicorn app.main:app
@@ -138,5 +138,5 @@ The structure is modular enough to swap storage and indexing backends, but it is
 
 ### Performance
 
-1. The project was developed on CPU-only hardware.
+1. The project was developed on CPU-only hardware - 8GB RAM, 4 cores.
 2. Embedding, reranking, and indexing are significantly faster with GPUs and tuned runtime settings.

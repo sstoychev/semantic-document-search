@@ -22,12 +22,12 @@ batch_size = 100
 
 [embedding]
 model = BAAI/bge-small-en-v1.5
+rerank_model = cross-encoder/ms-marco-MiniLM-L-6-v2
 
 [auth]
-secret_key = change-me-in-production
 algorithm = HS256
-access_token_expire_minutes = 30
-; Populated by setup_venv.sh — do not edit manually
-admin_username = admin
-admin_hashed_password =
-admin_salt =
+access_token_expire_minutes = 60
+; Admin username is fixed in code to: document-admin
+; Populated by setup_venv.sh
+admin_password =
+admin_jwt_salt =

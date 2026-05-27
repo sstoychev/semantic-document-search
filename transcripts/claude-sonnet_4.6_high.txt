@@ -377,3 +377,8 @@ Add part for the tests and the project structure being modular - db engine, mode
 In the modular structure not being zero-change add note for changing the models - it would require embeding size tuning, etc..
 
 --------------
+
+I'm testing the complete setup process. In config.ini admin_username is set to admin, which the real admin is document-admin.
+Also - after seeding the database with msmarco/wikipedia are the documents properly indexed?
+
+--------------

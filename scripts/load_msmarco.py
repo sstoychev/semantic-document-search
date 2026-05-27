@@ -147,6 +147,10 @@ def main() -> None:
             f"  total {total_elapsed:6.1f}s"
         )
 
+    print("\nFinalizing ANN index ...")
+    from app.database import ensure_lance_index  # noqa: PLC0415
+    ensure_lance_index()
+
     print(f"\nDone. {indexed:,} documents indexed in {time.perf_counter() - t_start:.1f}s")
 
 

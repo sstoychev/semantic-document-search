@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
 First-time setup helper.
-Copies config.example.ini → config.ini and stores a salted admin password hash.
+Copies config.example -> config.ini and stores admin auth settings.
 Uses only the Python standard library — safe to run before pip install.
 """
 import configparser
 import getpass
-import hashlib
+import secrets
 import shutil
-import time
 from pathlib import Path
 
 CONFIG_FILE = Path("config.ini")
@@ -38,19 +37,20 @@ def main() -> None:
             break
         print("Passwords do not match, try again.")
 
-    # salt = Unix timestamp at setup time; stored alongside the hash
-    salt = str(int(time.time()))
-    hashed = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
-
     cfg = configparser.ConfigParser()
     cfg.read(CONFIG_FILE)
-    cfg["auth"]["admin_hashed_password"] = hashed
-    cfg["auth"]["admin_salt"] = salt
+
+    if "auth" not in cfg:
+        cfg["auth"] = {}
+
+    # Admin username is fixed in code to "document-admin".
+    cfg["auth"]["admin_password"] = password
+    cfg["auth"]["admin_jwt_salt"] = secrets.token_hex(32)
 
     with CONFIG_FILE.open("w") as fh:
         cfg.write(fh)
 
-    print("Admin credentials saved to config.ini.")
+    print("Admin auth settings saved to config.ini.")
 
 
 if __name__ == "__main__":
