@@ -75,6 +75,11 @@ def _get_nlp():
     return _nlp
 
 
+def preload_nlp() -> None:
+    """Eagerly load the spaCy pipeline during app startup."""
+    _get_nlp()
+
+
 # ---------------------------------------------------------------------------
 # Public data structure
 # ---------------------------------------------------------------------------

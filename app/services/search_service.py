@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 
 from sqlalchemy import bindparam, text
 
@@ -49,6 +50,12 @@ def _get_cross_encoder():
             settings.rerank_model, local_files_only=True
         )
     return _cross_encoder
+
+
+def preload_models() -> None:
+    """Eagerly load search models once at app startup."""
+    _get_embed_model()
+    _get_cross_encoder()
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +185,12 @@ def _fetch_chunks(chunk_ids: list[int]) -> dict[int, dict]:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def search(query: str, top_k: int = 20, retrieval_k: int = 200) -> list[dict]:
+def search(
+    query: str,
+    top_k: int = 20,
+    retrieval_k: int = 200,
+    debug: bool = False,
+) -> list[dict] | dict[str, object]:
     """Hybrid search pipeline.
 
     Steps
@@ -196,35 +208,77 @@ def search(query: str, top_k: int = 20, retrieval_k: int = 200) -> list[dict]:
         chunk_id, document_id, document_name, document_path,
         score (cross-encoder), snippet (raw_text), breadcrumbs.
     """
+    total_start = time.perf_counter()
     if not query.strip():
+        if debug:
+            return {
+                "results": [],
+                "timings_ms": {
+                    "vector_generation": 0.0,
+                    "lancedb_search": 0.0,
+                    "sqlite_search": 0.0,
+                    "rrf": 0.0,
+                    "fetch_chunks": 0.0,
+                    "rerank": 0.0,
+                    "build_results": 0.0,
+                    "total": 0.0,
+                },
+            }
         return []
 
     # 1. Embed
+    t0 = time.perf_counter()
     embed = _get_embed_model()
     query_vec = embed.encode(
         query, normalize_embeddings=True, show_progress_bar=False
     ).tolist()
+    vector_generation_ms = (time.perf_counter() - t0) * 1000.0
 
     # 2. & 3. Retrieve
+    t1 = time.perf_counter()
     vector_hits = _vector_search(query_vec, retrieval_k)
+    lancedb_search_ms = (time.perf_counter() - t1) * 1000.0
+
+    t2 = time.perf_counter()
     fts_hits = _fts_search(query, retrieval_k)
+    sqlite_search_ms = (time.perf_counter() - t2) * 1000.0
     logger.debug(
         "query=%r  vector_hits=%d  fts_hits=%d",
         query, len(vector_hits), len(fts_hits),
     )
 
     # 4. RRF
+    t3 = time.perf_counter()
     rrf_ranked = _rrf(vector_hits, fts_hits)
+    rrf_ms = (time.perf_counter() - t3) * 1000.0
     pool_ids = [cid for cid, _ in rrf_ranked[:_RERANK_POOL]]
 
     if not pool_ids:
+        total_ms = (time.perf_counter() - total_start) * 1000.0
+        if debug:
+            return {
+                "results": [],
+                "timings_ms": {
+                    "vector_generation": round(vector_generation_ms, 3),
+                    "lancedb_search": round(lancedb_search_ms, 3),
+                    "sqlite_search": round(sqlite_search_ms, 3),
+                    "rrf": round(rrf_ms, 3),
+                    "fetch_chunks": 0.0,
+                    "rerank": 0.0,
+                    "build_results": 0.0,
+                    "total": round(total_ms, 3),
+                },
+            }
         return []
 
     # Fetch metadata for the rerank pool
+    t4 = time.perf_counter()
     meta = _fetch_chunks(pool_ids)
+    fetch_chunks_ms = (time.perf_counter() - t4) * 1000.0
     present_ids = [cid for cid in pool_ids if cid in meta]
 
     # 5. Cross-encoder rerank
+    t5 = time.perf_counter()
     encoder = _get_cross_encoder()
     pairs = [(query, meta[cid]["raw_text"]) for cid in present_ids]
     ce_scores = encoder.predict(pairs, show_progress_bar=False)
@@ -234,8 +288,10 @@ def search(query: str, top_k: int = 20, retrieval_k: int = 200) -> list[dict]:
         key=lambda x: float(x[1]),
         reverse=True,
     )
+    rerank_ms = (time.perf_counter() - t5) * 1000.0
 
     # 6. Build results
+    t6 = time.perf_counter()
     results = []
     for cid, score in reranked[:top_k]:
         m = meta[cid]
@@ -248,5 +304,23 @@ def search(query: str, top_k: int = 20, retrieval_k: int = 200) -> list[dict]:
             "snippet": m["raw_text"],
             "breadcrumbs": m["breadcrumbs"],
         })
+    build_results_ms = (time.perf_counter() - t6) * 1000.0
+
+    total_ms = (time.perf_counter() - total_start) * 1000.0
+
+    if debug:
+        return {
+            "results": results,
+            "timings_ms": {
+                "vector_generation": round(vector_generation_ms, 3),
+                "lancedb_search": round(lancedb_search_ms, 3),
+                "sqlite_search": round(sqlite_search_ms, 3),
+                "rrf": round(rrf_ms, 3),
+                "fetch_chunks": round(fetch_chunks_ms, 3),
+                "rerank": round(rerank_ms, 3),
+                "build_results": round(build_results_ms, 3),
+                "total": round(total_ms, 3),
+            },
+        }
 
     return results

@@ -58,6 +58,16 @@ def _get_embedding_model():
     return _embedding_model
 
 
+def preload_models() -> None:
+    """Eagerly load all indexing-time models once at app startup."""
+    _get_tokenizer()
+    _get_embedding_model()
+
+    # Chunking relies on spaCy sentence segmentation for paragraph splitting.
+    from app.chunker.semantic import preload_nlp
+    preload_nlp()
+
+
 # ---------------------------------------------------------------------------
 # LanceDB table
 # ---------------------------------------------------------------------------

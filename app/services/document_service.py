@@ -1,7 +1,13 @@
+from pathlib import Path
+
 from sqlalchemy.orm import Session
 
+from app.database import lance_db
 from app.models.document import Document
 from app.schemas.document import DocumentCreate, DocumentUpdate, SearchQuery, SearchResult
+from app.services.indexing_service import process_files
+
+VECTOR_TABLE = "chunk_vectors"
 
 
 class DocumentService:
@@ -11,14 +17,34 @@ class DocumentService:
 
     def create(self, db: Session, payload: DocumentCreate) -> Document:
         """
-        Persist a new document record to SQLite.
-        Use indexing_service.process_files() to also chunk and embed.
+        Index a document path end-to-end and return the persisted document row.
         """
-        db_doc = Document(**payload.model_dump())
-        db.add(db_doc)
-        db.commit()
-        db.refresh(db_doc)
+        file_path = Path(payload.document_path).expanduser().resolve()
+        if not file_path.exists() or not file_path.is_file():
+            raise FileNotFoundError(f"Document path does not exist or is not a file: {file_path}")
+
+        process_files([file_path])
+
+        db_doc = (
+            db.query(Document)
+            .filter(Document.document_path == str(file_path))
+            .first()
+        )
+        if db_doc is None:
+            raise RuntimeError("Document indexing completed but no SQLite document row was found")
+
+        # Preserve user-provided display name after indexing (which defaults to file name).
+        if payload.name and db_doc.name != payload.name:
+            db_doc.name = payload.name
+            db.commit()
+            db.refresh(db_doc)
+
         return db_doc
+
+    def create_from_path(self, db: Session, file_path: Path, name: str | None = None) -> Document:
+        """Internal helper for indexing a server-side file path."""
+        payload = DocumentCreate(document_path=str(file_path), name=name or file_path.name)
+        return self.create(db, payload)
 
     def get(self, db: Session, document_id: int) -> Document | None:
         """Retrieve a single document by primary key."""
@@ -40,22 +66,33 @@ class DocumentService:
         return db_doc
 
     def delete(self, db: Session, document_id: int) -> bool:
-        """
-        Remove a document and its chunks from SQLite.
-        TODO: delete the corresponding vectors from LanceDB.
-        """
+        """Remove document/chunks from SQLite and vectors from LanceDB."""
         db_doc = self.get(db, document_id)
         if db_doc is None:
             return False
+
+        if VECTOR_TABLE in lance_db.table_names():
+            table = lance_db.open_table(VECTOR_TABLE)
+            table.delete(f"document_id = {db_doc.id}")
+
         db.delete(db_doc)
         db.commit()
         return True
 
-    def search(self, db: Session, query: SearchQuery) -> list[SearchResult]:
+    def search(self, db: Session, query: SearchQuery) -> tuple[list[SearchResult], dict[str, float] | None]:
         """Hybrid search: vector + FTS + RRF + cross-encoder reranking."""
         from app.services import search_service
-        hits = search_service.search(query.query, top_k=query.limit)
-        return [
+        payload = search_service.search(query.query, top_k=query.limit, debug=query.debug)
+
+        debug_timings: dict[str, float] | None = None
+        if query.debug:
+            wrapped = payload if isinstance(payload, dict) else {"results": payload, "timings_ms": {}}
+            hits = wrapped.get("results", [])
+            debug_timings = wrapped.get("timings_ms", None)
+        else:
+            hits = payload if isinstance(payload, list) else payload.get("results", [])
+
+        results = [
             SearchResult(
                 chunk_id=h["chunk_id"],
                 document_id=h["document_id"],
@@ -67,6 +104,7 @@ class DocumentService:
             )
             for h in hits
         ]
+        return results, debug_timings
 
 
 document_service = DocumentService()

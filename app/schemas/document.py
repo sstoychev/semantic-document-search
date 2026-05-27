@@ -23,6 +23,7 @@ class DocumentResponse(DocumentBase):
 class SearchQuery(BaseModel):
     query: str
     limit: int = 10
+    debug: bool = False
 
 
 class SearchResult(BaseModel):

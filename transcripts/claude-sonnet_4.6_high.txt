@@ -269,3 +269,56 @@ Ok, do the necessary changes to switch to IVF_HNSW_PQ or any other HNSW index if
 2. Create simple test files in tmp/ with 5-6 search queries, which I can execute and see the results
 
 -------------
+
+Now I want to finish the API. I need:
+1. On app start to load all necessary models and keep them in memory, not load them on every request
+2. Link the API endpoints for documents with the relevant services.
+
+-------------
+
+Create webpage at /demo route. It should have 2 tabs:
+- search (default) to input query and see the results
+- add - option to select document and post to be added to the database. We should limit the files to txt, md, docx, pdf, html, htm and size 200k max.
+
+-------------
+
+We already had @router.post("/",...)
+Why did you make @router.post("/upload",) ?
+
+-------------
+
+There should be no public "index document on the server" endpoint as the users don't know the files on the server and the people who have access to the server can do it with scripts.
+
+-------------
+
+When I perform a search I want:
+1. To see elapsed time for the whole request
+2. File names to be links to show in another tab the whole document, only this specific document
+
+-------------
+
+In the view don't expose full file path. Show only the path relative to the document root/project root
+
+-------------
+
+Create plain txt document "wikipedia_titles.txt" with the titles of all wikipedia documes we are using, the ones in data/datasets/wikipedia
+
+-------------
+
+In the demo page I want more debug information. Beside the elapsed time I want to see how much it took for:
+1. Vector generation for the input
+2. LanceDB search
+3. SQLite search
+4. Rest data manipulations
+
+The debug should be parameter for the search service method with default value =false
+
+--------------
+
+A search is performed in about 6.5s, 5.7s are for "rest". Remove rest, add all steps separately - add RRF, fetch_chunks, rerank, build results
+
+--------------
+
+In demo/add I want to see debug too - total time and split for each step.
+
+--------------

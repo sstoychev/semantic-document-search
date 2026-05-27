@@ -33,7 +33,7 @@ Notes:
     - index update after X changes or X time
     - main + delta index
 5. Authorisation/Authentication
-    - master password set at project initialization
+    - ✅master password set at project initialization
     - login API methods
     - users creation with permissions
     - JWT with salt for permission groups. Salt reset/invalidation for token revocation.
